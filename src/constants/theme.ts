@@ -7,6 +7,10 @@ import '@/global.css';
 
 import { Platform } from 'react-native';
 
+import { radius, semanticColors, spacing, typography } from '@/shared';
+
+export { radius as Radius, semanticColors as SemanticColors, typography as Typography };
+
 export const Colors = {
   light: {
     text: '#000000',
@@ -53,12 +57,12 @@ export const Fonts = Platform.select({
 
 export const Spacing = {
   half: 2,
-  one: 4,
-  two: 8,
-  three: 16,
-  four: 24,
-  five: 32,
-  six: 64,
+  one: spacing.xs,
+  two: spacing.sm,
+  three: spacing.md,
+  four: spacing.lg,
+  five: spacing.xl,
+  six: spacing['3xl'],
 } as const;
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
