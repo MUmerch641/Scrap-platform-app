@@ -1,13 +1,13 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   useColorScheme,
   ViewStyle,
 } from 'react-native';
-
 import { radius, semanticColors, spacing, typography } from '@/shared/theme';
 
 interface ButtonProps {
@@ -28,12 +28,13 @@ export function Button({
   style,
 }: ButtonProps) {
   const colorScheme = useColorScheme();
-  const colors = semanticColors[colorScheme === 'dark' ? 'dark' : 'light'];
+  const isDark = colorScheme === 'dark';
+  const colors = semanticColors[isDark ? 'dark' : 'light'];
 
   const getBackgroundColor = (pressed: boolean) => {
     if (disabled) return colors.surfaceSelected;
-    if (variant === 'primary') return pressed ? '#1d4ed8' : colors.primary;
-    if (variant === 'secondary') return pressed ? colors.surfaceSelected : colors.surface;
+    if (variant === 'primary') return pressed && Platform.OS === 'ios' ? '#1d4ed8' : colors.primary;
+    if (variant === 'secondary') return pressed && Platform.OS === 'ios' ? colors.surfaceSelected : colors.surface;
     return 'transparent';
   };
 
@@ -49,14 +50,28 @@ export function Button({
       ? { borderWidth: 1, borderColor: disabled ? colors.border : colors.primary }
       : {};
 
+  // Android: use a ripple overlay via the `android_ripple` prop
+  // iOS: use opacity-based press feedback
+  const androidRipple = Platform.OS === 'android'
+    ? {
+        color: variant === 'primary' ? 'rgba(255,255,255,0.2)' : colors.surfaceSelected,
+        borderless: false,
+      }
+    : undefined;
+
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      android_ripple={androidRipple}
       style={({ pressed }) => [
         styles.button,
         { backgroundColor: getBackgroundColor(pressed) },
         borderStyle,
+        // iOS opacity feedback; Android uses ripple so no opacity change
+        Platform.OS === 'ios' && pressed && { opacity: 0.75 },
         style,
       ]}
     >
@@ -71,12 +86,14 @@ export function Button({
 
 const styles = StyleSheet.create({
   button: {
-    height: 40,
+    minHeight: 44,
     borderRadius: radius.md,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
     flexDirection: 'row',
+    overflow: 'hidden', // required for Android ripple to be clipped to border radius
   },
   text: {
     fontSize: typography.fontSize.sm,
