@@ -40,15 +40,27 @@ export default function Layout() {
   });
 
   React.useEffect(() => {
-    const timeout = setTimeout(() => setFontLoadExpired(true), FONT_LOAD_TIMEOUT_MS);
-    return () => clearTimeout(timeout);
+    let isMounted = true;
+    const timeout = setTimeout(() => {
+      if (isMounted) setFontLoadExpired(true);
+    }, FONT_LOAD_TIMEOUT_MS);
+    return () => {
+      isMounted = false;
+      clearTimeout(timeout);
+    };
   }, []);
 
   // Delayed spinner — mirrors AuthLoadingScreen so the font-loading phase
   // and auth phase look identical and never flash a spinner on fast launches
   React.useEffect(() => {
-    const timer = setTimeout(() => setShowSpinner(true), SPINNER_DELAY_MS);
-    return () => clearTimeout(timer);
+    let isMounted = true;
+    const timer = setTimeout(() => {
+      if (isMounted) setShowSpinner(true);
+    }, SPINNER_DELAY_MS);
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
   }, []);
 
   const appIsReady = fontsLoaded || Boolean(fontError) || fontLoadExpired;

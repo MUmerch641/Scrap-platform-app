@@ -40,7 +40,7 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
-  const mountedRef = useRef(true);
+  const mountedRef = useRef(false);
   const signInInProgressRef = useRef(false);
   const pendingProfileRef = useRef<{
     userId: string;

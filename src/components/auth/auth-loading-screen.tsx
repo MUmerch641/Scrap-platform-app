@@ -50,9 +50,13 @@ export function AuthLoadingScreen() {
   const [showSpinner, setShowSpinner] = useState(false);
 
   useEffect(() => {
-    const spinnerTimer = setTimeout(() => setShowSpinner(true), SPINNER_DELAY_MS);
+    let isMounted = true;
+    const spinnerTimer = setTimeout(() => {
+      if (isMounted) setShowSpinner(true);
+    }, SPINNER_DELAY_MS);
 
     void AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
+      if (!isMounted) return;
       if (reduceMotion) {
         symbolScale.value = 1;
         wordmarkOpacity.value = 1;
@@ -89,7 +93,10 @@ export function AuthLoadingScreen() {
       );
     });
 
-    return () => clearTimeout(spinnerTimer);
+    return () => {
+      isMounted = false;
+      clearTimeout(spinnerTimer);
+    };
   }, [symbolScale, wordmarkOpacity, wordmarkTranslateY]);
 
   const symbolStyle = useAnimatedStyle(() => ({
