@@ -382,79 +382,92 @@ export default function CustomersScreen() {
         transparent
         onRequestClose={() => setShowFormModal(false)}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
-          <Animated.View
-            style={[
-              styles.modalCard,
-              { backgroundColor: colors.modalSurface, borderColor: colors.border },
-              modalAnimStyle,
-            ]}
+        {/*
+         * On iOS, KeyboardAvoidingView must NOT wrap the transparent overlay.
+         * Doing so shifts the entire semi-transparent backdrop when the keyboard
+         * opens, which looks broken and displaces the modal to the top on small
+         * iPhones. Instead, the overlay is a plain View (fixed in place) and KAV
+         * wraps only the card interior so the card itself adjusts for the keyboard.
+         */}
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            // iOS: 'padding' adds space below the KAV as the keyboard rises.
+            // Android: 'height' shrinks the KAV height — needed because this is a
+            // transparent Modal (separate Dialog window) which does NOT participate in
+            // softwareKeyboardLayoutMode="resize" that applies to the main activity.
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalKAV}
           >
-            {/* Header */}
-            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Add New Customer</Text>
-              <Pressable
-                onPress={() => setShowFormModal(false)}
-                hitSlop={12}
-                accessibilityRole="button"
-                accessibilityLabel="Close modal"
-              >
-                <Text style={[styles.closeText, { color: colors.textMuted }]}>✕</Text>
-              </Pressable>
-            </View>
-
-            {/* Scrollable form */}
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator
-              contentContainerStyle={styles.formScrollContent}
+            <Animated.View
+              style={[
+                styles.modalCard,
+                { backgroundColor: colors.modalSurface, borderColor: colors.border },
+                modalAnimStyle,
+              ]}
             >
-              {formError ? (
-                <Text style={[styles.errorText, { color: colors.danger }]}>{formError}</Text>
-              ) : null}
+              {/* Header */}
+              <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Add New Customer</Text>
+                <Pressable
+                  onPress={() => setShowFormModal(false)}
+                  hitSlop={12}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close modal"
+                >
+                  <Text style={[styles.closeText, { color: colors.textMuted }]}>✕</Text>
+                </Pressable>
+              </View>
 
-              <FormFieldAnimated delay={MODAL_STAGGER * 0}>
-                <FormInput label="Customer Name *" value={name} onChangeText={setName}
-                  placeholder="e.g. Acme Scrap Recycling" />
-              </FormFieldAnimated>
+              {/* Scrollable form */}
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator
+                contentContainerStyle={styles.formScrollContent}
+              >
+                {formError ? (
+                  <Text style={[styles.errorText, { color: colors.danger }]}>{formError}</Text>
+                ) : null}
 
-              <FormFieldAnimated delay={MODAL_STAGGER * 1}>
-                <FormInput label="Phone Number *" value={phone} onChangeText={setPhone}
-                  keyboardType="phone-pad" placeholder="e.g. +1 555-0192" />
-              </FormFieldAnimated>
+                <FormFieldAnimated delay={MODAL_STAGGER * 0}>
+                  <FormInput label="Customer Name *" value={name} onChangeText={setName}
+                    placeholder="e.g. Acme Scrap Recycling" />
+                </FormFieldAnimated>
 
-              <FormFieldAnimated delay={MODAL_STAGGER * 2}>
-                <FormInput label="Email Address" value={email} onChangeText={setEmail}
-                  keyboardType="email-address" autoCapitalize="none"
-                  placeholder="e.g. contact@acmescrap.com" />
-              </FormFieldAnimated>
+                <FormFieldAnimated delay={MODAL_STAGGER * 1}>
+                  <FormInput label="Phone Number *" value={phone} onChangeText={setPhone}
+                    keyboardType="phone-pad" placeholder="e.g. +1 555-0192" />
+                </FormFieldAnimated>
 
-              <FormFieldAnimated delay={MODAL_STAGGER * 3}>
-                <FormInput label="Pickup Address *" value={address} onChangeText={setAddress}
-                  multiline numberOfLines={2}
-                  placeholder="e.g. 100 Industrial Parkway, Dock 4" />
-              </FormFieldAnimated>
+                <FormFieldAnimated delay={MODAL_STAGGER * 2}>
+                  <FormInput label="Email Address" value={email} onChangeText={setEmail}
+                    keyboardType="email-address" autoCapitalize="none"
+                    placeholder="e.g. contact@acmescrap.com" />
+                </FormFieldAnimated>
 
-              <FormFieldAnimated delay={MODAL_STAGGER * 4}>
-                <FormInput label="Notes" value={notes} onChangeText={setNotes}
-                  multiline numberOfLines={2}
-                  placeholder="Optional customer instructions or contact details" />
-              </FormFieldAnimated>
-            </ScrollView>
+                <FormFieldAnimated delay={MODAL_STAGGER * 3}>
+                  <FormInput label="Pickup Address *" value={address} onChangeText={setAddress}
+                    multiline numberOfLines={2}
+                    placeholder="e.g. 100 Industrial Parkway, Dock 4" />
+                </FormFieldAnimated>
 
-            {/* Sticky footer */}
-            <View style={[styles.stickyFooter, { borderTopColor: colors.border }]}>
-              <Button title="Cancel" variant="outline" style={styles.footerBtn}
-                onPress={() => { resetForm(); setShowFormModal(false); }} />
-              <Button title="Add Customer" variant="primary" style={styles.footerBtn}
-                loading={submitting} disabled={submitting || !isFormValid}
-                onPress={() => void handleCreateCustomer()} />
-            </View>
-          </Animated.View>
-        </KeyboardAvoidingView>
+                <FormFieldAnimated delay={MODAL_STAGGER * 4}>
+                  <FormInput label="Notes" value={notes} onChangeText={setNotes}
+                    multiline numberOfLines={2}
+                    placeholder="Optional customer instructions or contact details" />
+                </FormFieldAnimated>
+              </ScrollView>
+
+              {/* Sticky footer */}
+              <View style={[styles.stickyFooter, { borderTopColor: colors.border }]}>
+                <Button title="Cancel" variant="outline" style={styles.footerBtn}
+                  onPress={() => { resetForm(); setShowFormModal(false); }} />
+                <Button title="Add Customer" variant="primary" style={styles.footerBtn}
+                  loading={submitting} disabled={submitting || !isFormValid}
+                  onPress={() => void handleCreateCustomer()} />
+              </View>
+            </Animated.View>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
     </ScreenScaffold>
   );
@@ -554,10 +567,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.md,
   },
+  modalKAV: {
+    width: '100%',
+    maxHeight: '85%',
+  },
   modalCard: {
     borderRadius: radius.lg,
     borderWidth: 1,
-    maxHeight: '85%',
     flexDirection: 'column',
     overflow: 'hidden',
   },

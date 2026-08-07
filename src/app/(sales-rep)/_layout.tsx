@@ -20,7 +20,10 @@ export default function SalesRepLayout() {
 
   return (
     <NativeTabs
-      key={colorScheme ?? 'light'}
+      // Only force a remount on Android (where style props require a new native view).
+      // On iOS the native UITabBarController adapts to system appearance automatically;
+      // remounting here would destroy tab state and flash the screen.
+      key={Platform.OS === 'android' ? (colorScheme ?? 'light') : undefined}
       backgroundColor={Platform.OS === 'ios' ? undefined : colors.tabBarBackground}
       tintColor={colors.tabBarSelected}
       iconColor={{

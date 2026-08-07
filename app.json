@@ -48,8 +48,7 @@
       [
         "expo-status-bar",
         {
-          "hidden": false,
-          "style": "light"
+          "hidden": false
         }
       ],
       "expo-secure-store",

@@ -504,10 +504,12 @@ export default function CreatePickupScreen() {
             />
             <View style={styles.presetRow}>
               <Pressable onPress={() => setRequestedDate(getTodayString())}
+                hitSlop={10}
                 style={[styles.presetChip, { borderColor: colors.border }]}>
                 <Text style={[styles.presetText, { color: colors.primary }]}>Today</Text>
               </Pressable>
               <Pressable onPress={() => setRequestedDate(getTomorrowString())}
+                hitSlop={10}
                 style={[styles.presetChip, { borderColor: colors.border }]}>
                 <Text style={[styles.presetText, { color: colors.primary }]}>Tomorrow</Text>
               </Pressable>
@@ -527,6 +529,7 @@ export default function CreatePickupScreen() {
             <View style={styles.presetRow}>
               {['09:00', '11:00', '14:00', '16:00'].map((t) => (
                 <Pressable key={t} onPress={() => setRequestedTime(t)}
+                  hitSlop={10}
                   style={[styles.presetChip, {
                     borderColor:     requestedTime === t ? colors.accent : colors.border,
                     backgroundColor: requestedTime === t ? colors.accent : 'transparent',
@@ -552,6 +555,7 @@ export default function CreatePickupScreen() {
             <View style={styles.presetRow}>
               {MATERIAL_OPTIONS.map((m) => (
                 <Pressable key={m} onPress={() => setMaterialType(m)}
+                  hitSlop={10}
                   style={[styles.presetChip, {
                     borderColor:     materialType === m ? colors.accent : colors.border,
                     backgroundColor: materialType === m ? colors.accent : 'transparent',
