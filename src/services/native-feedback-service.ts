@@ -47,16 +47,12 @@ export function showInfoMessage(message: string): void {
  */
 export function showErrorMessage(message: string, title = 'Error'): void {
   triggerNegativeHaptic('error');
-  if (Platform.OS === 'android') {
-    ToastAndroid.show(message, ToastAndroid.LONG);
-  } else {
-    Alert.alert(title, message, [{ text: 'OK' }]);
-  }
+  Alert.alert(title, message, [{ text: 'OK' }]);
 }
 
 /**
  * Displays a native platform confirmation dialog with Confirm and Cancel buttons.
- * Triggers a warning haptic once upon presenting the confirmation dialog.
+ * Confirmation is native and does not trigger haptic feedback.
  */
 export function showNativeConfirmation(
   title: string,
@@ -65,7 +61,6 @@ export function showNativeConfirmation(
   confirmText = 'Confirm',
   cancelText = 'Cancel'
 ): void {
-  triggerNegativeHaptic('warning');
   Alert.alert(
     title,
     message,

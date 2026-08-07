@@ -1,6 +1,8 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import { brandColors } from '@/shared/theme';
+
 export interface PermissionStatusResult {
   granted: boolean;
   canAskAgain: boolean;
@@ -61,7 +63,7 @@ export async function scheduleLocalSystemNotification(
       name: 'default',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#2563eb',
+      lightColor: brandColors.copper,
     });
   }
 

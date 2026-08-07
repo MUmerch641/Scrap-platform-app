@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Pressable,
   StyleSheet,
@@ -6,107 +6,191 @@ import {
   TextInput as RNTextInput,
   useColorScheme,
   View,
-} from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Href, useFocusEffect, useRouter } from 'expo-router';
+} from 'react-native'
+import { useFocusEffect, useRouter } from 'expo-router'
+import Animated, { FadeInDown } from 'react-native-reanimated'
 
-import { useUserRole } from '@/app/context/UserRoleContext';
-import { BrandHeader } from '@/components/ui/brand-header';
-import { FormInput } from '@/components/ui/form-input';
-import { PrimaryButton } from '@/components/ui/primary-button';
-import { ScreenScaffold } from '@/components/ui/screen-scaffold';
-import { authenticateUser } from '@/services/auth-service';
+import { useUserRole } from '@/app/context/UserRoleContext'
+import { BrandHeader } from '@/components/ui/brand-header'
+import { FormInput } from '@/components/ui/form-input'
+import { PrimaryButton } from '@/components/ui/primary-button'
+import { ScreenScaffold } from '@/components/ui/screen-scaffold'
+import { requestPasswordRecovery } from '@/services/auth-service'
 import {
   showErrorMessage,
   showInfoMessage,
   showSuccessMessage,
   triggerNegativeHaptic,
-} from '@/services/native-feedback-service';
-import { semanticColors, spacing } from '@/shared/theme';
+} from '@/services/native-feedback-service'
+import { semanticColors, spacing, typography } from '@/shared/theme'
+
+const RECOVERY_SENT_MESSAGE =
+  'If the address can receive recovery email password reset instructions have been sent'
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function SignInScreen() {
-  const router = useRouter();
-  const { setUserProfile } = useUserRole();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const colors = semanticColors[isDark ? 'dark' : 'light'];
+  const router = useRouter()
+  const colorScheme = useColorScheme()
+  const { signIn, authError, clearAuthError } = useUserRole()
 
-  // Start with clean, empty inputs for production readiness
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [emailError, setEmailError] = useState<string | undefined>(undefined);
-  const [passwordError, setPasswordError] = useState<string | undefined>(undefined);
+  const colors =
+    semanticColors[colorScheme === 'dark' ? 'dark' : 'light']
 
-  const passwordInputRef = useRef<RNTextInput>(null);
+  const passwordInputRef = useRef<RNTextInput>(null)
 
-  // Reset errors and clean sensitive state when screen focus changes
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+
+  const [loading, setLoading] = useState(false)
+  const [recovering, setRecovering] = useState(false)
+
+  const [notice, setNotice] = useState<string>()
+  const [emailError, setEmailError] = useState<string>()
+  const [passwordError, setPasswordError] = useState<string>()
+
+  const busy = loading || recovering
+
+  useEffect(() => {
+    if (!authError) {
+      return
+    }
+
+    showErrorMessage(authError, 'Account access')
+    clearAuthError()
+  }, [authError, clearAuthError])
+
   useFocusEffect(
     useCallback(() => {
       return () => {
-        setEmailError(undefined);
-        setPasswordError(undefined);
-        setLoading(false);
-      };
+        setEmailError(undefined)
+        setPasswordError(undefined)
+        setNotice(undefined)
+        setLoading(false)
+        setRecovering(false)
+      }
     }, [])
-  );
+  )
 
   const validate = (): boolean => {
-    let isValid = true;
-    setEmailError(undefined);
-    setPasswordError(undefined);
+    const trimmedEmail = email.trim()
 
-    const trimmedEmail = email.trim();
+    let valid = true
+
+    setEmailError(undefined)
+    setPasswordError(undefined)
+
     if (!trimmedEmail) {
-      setEmailError('Email address is required.');
-      isValid = false;
-    } else if (!/\S+@\S+\.\S+/.test(trimmedEmail)) {
-      setEmailError('Please enter a valid email address.');
-      isValid = false;
+      setEmailError('Email address is required')
+      valid = false
+    } else if (!EMAIL_PATTERN.test(trimmedEmail)) {
+      setEmailError('Please enter a valid email address')
+      valid = false
     }
 
     if (!password) {
-      setPasswordError('Password is required.');
-      isValid = false;
+      setPasswordError('Password is required')
+      valid = false
     }
 
-    if (!isValid) {
-      triggerNegativeHaptic('error');
+    if (!valid) {
+      void triggerNegativeHaptic('error')
     }
 
-    return isValid;
-  };
+    return valid
+  }
 
-  const handleSignIn = async () => {
-    if (loading) return; // Prevent duplicate submissions
-    if (!validate()) return;
+  const handleEmailChange = (value: string): void => {
+    setEmail(value)
+    setNotice(undefined)
 
-    setLoading(true);
+    if (emailError) {
+      setEmailError(undefined)
+    }
+  }
+
+  const handlePasswordChange = (value: string): void => {
+    setPassword(value)
+
+    if (passwordError) {
+      setPasswordError(undefined)
+    }
+  }
+
+  const handleSignIn = async (): Promise<void> => {
+    if (busy || !validate()) {
+      return
+    }
+
+    setNotice(undefined)
+    setLoading(true)
+
     try {
-      const result = await authenticateUser({ email, password });
-      if (result.success && result.session && result.targetRoute) {
-        setUserProfile({
-          userId: result.session.userId,
-          email: result.session.email,
-          role: result.session.role,
-        });
-        showSuccessMessage('Signed in successfully');
-        router.replace(result.targetRoute as Href);
-      } else {
-        showErrorMessage(result.error || 'Invalid email or password.');
+      const result = await signIn(email.trim(), password)
+
+      if (result.success && result.route) {
+        showSuccessMessage('Signed in successfully')
+        router.replace(result.route)
+        return
       }
+
+      showErrorMessage(
+        result.error || 'Unable to sign in',
+        'Sign in failed'
+      )
     } catch {
-      showErrorMessage('Network connection error. Please try again.');
+      showErrorMessage(
+        'Unable to connect Check your connection and try again',
+        'Sign in failed'
+      )
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  const handleForgotPassword = () => {
-    showInfoMessage('Password recovery will be enabled once backend authentication is connected.');
-  };
+  const handleForgotPassword = async (): Promise<void> => {
+    if (busy) {
+      return
+    }
 
-  const isFormEmpty = !email.trim() || !password;
+    const trimmedEmail = email.trim()
+
+    setNotice(undefined)
+
+    if (!trimmedEmail || !EMAIL_PATTERN.test(trimmedEmail)) {
+      setEmailError(
+        'Enter a valid email address to reset your password'
+      )
+
+      void triggerNegativeHaptic('error')
+      return
+    }
+
+    setEmailError(undefined)
+    setRecovering(true)
+
+    try {
+      const result = await requestPasswordRecovery(trimmedEmail)
+
+      if (result.success) {
+        setNotice(RECOVERY_SENT_MESSAGE)
+        showInfoMessage(RECOVERY_SENT_MESSAGE)
+        return
+      }
+
+      showErrorMessage(
+        result.error || 'Unable to send a recovery email',
+        'Password recovery'
+      )
+    } catch {
+      showErrorMessage(
+        'Unable to connect Check your connection and try again',
+        'Password recovery'
+      )
+    } finally {
+      setRecovering(false)
+    }
+  }
 
   return (
     <ScreenScaffold
@@ -115,7 +199,6 @@ export default function SignInScreen() {
       avoidFloatingTabBar={false}
       contentContainerStyle={styles.scrollContent}
     >
-      {/* 1. Branding Section (Logo + Company Name Placeholder) */}
       <Animated.View
         entering={FadeInDown.duration(350).delay(50)}
         style={styles.brandContainer}
@@ -123,30 +206,43 @@ export default function SignInScreen() {
         <BrandHeader />
       </Animated.View>
 
-      {/* 2. Welcome Title & Subtitle */}
       <Animated.View
         entering={FadeInDown.duration(350).delay(100)}
         style={styles.headerSection}
       >
-        <Text style={[styles.title, { color: colors.text }]}>Welcome back</Text>
-        <Text style={[styles.subtitle, { color: isDark ? '#a1a1aa' : '#6b7280' }]}>
+        <Text
+          accessibilityRole="header"
+          style={[
+            styles.title,
+            {
+              color: colors.text,
+            },
+          ]}
+        >
+          Welcome back
+        </Text>
+
+        <Text
+          style={[
+            styles.subtitle,
+            {
+              color: colors.textMuted,
+            },
+          ]}
+        >
           Sign in to continue to your workspace
         </Text>
       </Animated.View>
 
-      {/* 3. Form Section (Email, Password, Forgot Link, Sign In Button) */}
       <Animated.View
         entering={FadeInDown.duration(350).delay(150)}
         style={styles.formSection}
       >
         <FormInput
-          label="Email address"
+          label="Email"
           placeholder="name@company.com"
           value={email}
-          onChangeText={(text) => {
-            setEmail(text);
-            if (emailError) setEmailError(undefined);
-          }}
+          onChangeText={handleEmailChange}
           error={emailError}
           keyboardType="email-address"
           autoCapitalize="none"
@@ -154,111 +250,191 @@ export default function SignInScreen() {
           autoComplete="email"
           textContentType="emailAddress"
           returnKeyType="next"
-          editable={!loading}
-          onSubmitEditing={() => passwordInputRef.current?.focus()}
+          editable={!busy}
+          onSubmitEditing={() => {
+            passwordInputRef.current?.focus()
+          }}
         />
 
         <FormInput
           ref={passwordInputRef}
           label="Password"
-          placeholder="••••••••"
+          placeholder="Password"
           value={password}
-          onChangeText={(text) => {
-            setPassword(text);
-            if (passwordError) setPasswordError(undefined);
-          }}
+          onChangeText={handlePasswordChange}
           error={passwordError}
           isPassword
           autoComplete="password"
           textContentType="password"
           returnKeyType="done"
-          editable={!loading}
-          onSubmitEditing={handleSignIn}
+          editable={!busy}
+          onSubmitEditing={() => {
+            void handleSignIn()
+          }}
         />
 
         <View style={styles.forgotRow}>
           <Pressable
-            onPress={handleForgotPassword}
+            onPress={() => {
+              void handleForgotPassword()
+            }}
+            disabled={busy}
             hitSlop={12}
             accessibilityRole="button"
             accessibilityLabel="Forgot password"
-            style={({ pressed }) => [pressed && { opacity: 0.7 }]}
+            accessibilityState={{
+              disabled: busy,
+              busy: recovering,
+            }}
+            style={({ pressed }) => [
+              styles.forgotButton,
+              (pressed || busy) && styles.pressed,
+            ]}
           >
-            <Text style={[styles.forgotText, { color: colors.primary }]}>
-              Forgot password?
+            <Text
+              style={[
+                styles.forgotText,
+                {
+                  color: colors.primary,
+                },
+              ]}
+            >
+              {recovering ? 'Sending recovery email' : 'Forgot password?'}
             </Text>
           </Pressable>
         </View>
 
+        {notice ? (
+          <Text
+            accessibilityLiveRegion="polite"
+            style={[
+              styles.notice,
+              {
+                color: colors.textMuted,
+              },
+            ]}
+          >
+            {notice}
+          </Text>
+        ) : null}
+
         <PrimaryButton
           title="Sign In"
-          onPress={handleSignIn}
+          onPress={() => {
+            void handleSignIn()
+          }}
           loading={loading}
-          disabled={loading || isFormEmpty}
+          disabled={busy || !email.trim() || !password}
           style={styles.submitButton}
         />
       </Animated.View>
 
-      {/* 4. Authorised Staff Footer */}
       <Animated.View
         entering={FadeInDown.duration(350).delay(200)}
         style={styles.footerSection}
       >
-        <Text style={[styles.footerText, { color: isDark ? '#71717a' : '#9ca3af' }]}>
+        <Text
+          style={[
+            styles.footerText,
+            {
+              color: colors.textMuted,
+            },
+          ]}
+        >
           Secure access for authorised staff
         </Text>
       </Animated.View>
     </ScreenScaffold>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
   scrollContent: {
-    maxWidth: 400,
     width: '100%',
+    maxWidth: 400,
     alignSelf: 'center',
+    justifyContent: 'flex-start',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing['2xl'],
   },
+
   brandContainer: {
+    width: '100%',
+    marginBottom: spacing.lg,
+  },
+
+  headerSection: {
+    width: '100%',
+    alignItems: 'flex-start',
+    marginBottom: spacing.lg,
+  },
+
+  title: {
+    fontFamily: typography.fontFamily.heading,
+    fontSize: 28,
+    lineHeight: 34,
+    letterSpacing: -0.4,
     marginBottom: spacing.xs,
   },
-  headerSection: {
-    marginBottom: spacing.md,
-    alignItems: 'flex-start',
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-    marginBottom: 4,
-  },
+
   subtitle: {
+    fontFamily: typography.fontFamily.body,
     fontSize: 14,
     lineHeight: 20,
   },
+
   formSection: {
-    gap: 4,
+    width: '100%',
+    gap: spacing.xs,
   },
+
   forgotRow: {
+    width: '100%',
     alignItems: 'flex-end',
-    marginTop: -2,
+    marginTop: spacing.xs,
     marginBottom: spacing.md,
   },
-  forgotText: {
-    fontSize: 13,
-    fontWeight: '500',
+
+  forgotButton: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
+
+  forgotText: {
+    fontFamily: typography.fontFamily.bodySemibold,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+
+  notice: {
+    fontFamily: typography.fontFamily.body,
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: spacing.sm,
+  },
+
   submitButton: {
     marginTop: spacing.xs,
   },
+
   footerSection: {
-    marginTop: spacing.xl,
+    width: '100%',
     alignItems: 'center',
+    marginTop: spacing.xl,
+    paddingBottom: spacing.sm,
   },
+
   footerText: {
+    fontFamily: typography.fontFamily.body,
     fontSize: 12,
+    lineHeight: 18,
     letterSpacing: 0.2,
+    textAlign: 'center',
   },
-});
+
+  pressed: {
+    opacity: 0.7,
+  },
+})

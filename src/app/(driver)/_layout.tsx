@@ -1,25 +1,40 @@
-import React from 'react';
-import { useColorScheme } from 'react-native';
+import { useUserRole } from '@/app/context/UserRoleContext';
+import { AuthLoadingScreen } from '@/components/auth/auth-loading-screen';
+import { ROLES } from '@/shared/roles';
+import { semanticColors, typography } from '@/shared/theme';
+import { Redirect } from 'expo-router';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { semanticColors } from '@/shared/theme';
+import { Platform, useColorScheme } from 'react-native';
 
 export default function DriverLayout() {
+  const { session, role, isInitialLoading } = useUserRole();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const colors = semanticColors[isDark ? 'dark' : 'light'];
 
+  if (isInitialLoading) return <AuthLoadingScreen />;
+  if (!session) return <Redirect href="/(auth)/sign-in" />;
+  if (role !== ROLES.DRIVER) {
+    return <Redirect href={role === ROLES.SALES_REP ? '/(sales-rep)' : '/(auth)/sign-in'} />;
+  }
+
   return (
     <NativeTabs
-      backgroundColor={colors.surface}
-      tintColor={colors.primary}
+      key={colorScheme ?? 'light'}
+      backgroundColor={Platform.OS === 'ios' ? undefined : colors.surface}
+      tintColor={colors.accent}
       iconColor={{
-        default: isDark ? '#9ca3af' : '#6b7280',
-        selected: colors.primary
+        default: colors.textMuted,
+        selected: colors.accent
       }}
-      labelStyle={{
-        default: { color: isDark ? '#9ca3af' : '#6b7280' },
-        selected: { color: colors.primary }
-      }}
+      labelStyle={
+        Platform.OS === 'ios'
+          ? {
+              default: { color: colors.textMuted, fontFamily: typography.fontFamily.bodyMedium },
+              selected: { color: colors.accent, fontFamily: typography.fontFamily.bodySemibold },
+            }
+          : { fontFamily: typography.fontFamily.bodyMedium }
+      }
     >
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>

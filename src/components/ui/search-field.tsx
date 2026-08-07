@@ -1,11 +1,10 @@
-import React from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  useColorScheme,
-  View,
+    Pressable,
+    StyleSheet,
+    TextInput,
+    useColorScheme,
+    View,
 } from 'react-native';
 
 import { radius, semanticColors, spacing, typography } from '@/shared/theme';
@@ -32,22 +31,26 @@ export function SearchField({
       style={[
         styles.container,
         {
-          backgroundColor: isDark ? '#18181b' : '#f9fafb',
-          borderColor: isDark ? '#27272a' : '#e4e4e7',
+          backgroundColor: colors.inputSurface,
+          borderColor: colors.inputBorder,
         },
       ]}
     >
-      <Text style={[styles.searchIcon, { color: isDark ? '#71717a' : '#9ca3af' }]}>
-        🔍
-      </Text>
+      <Ionicons
+        name="search-outline"
+        size={16}
+        color={colors.textMuted}
+        style={styles.searchIcon}
+      />
       <TextInput
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={isDark ? '#71717a' : '#9ca3af'}
-        style={[styles.input, { color: colors.text }]}
+        placeholderTextColor={colors.inputPlaceholder}
+        style={[styles.input, { color: colors.inputText }]}
         autoCapitalize="none"
         autoCorrect={false}
+        returnKeyType="search"
       />
       {value.length > 0 && (
         <Pressable
@@ -60,9 +63,7 @@ export function SearchField({
           accessibilityLabel="Clear search"
           style={styles.clearButton}
         >
-          <Text style={[styles.clearText, { color: isDark ? '#a1a1aa' : '#6b7280' }]}>
-            ✕
-          </Text>
+          <Ionicons name="close-circle" size={16} color={colors.textMuted} />
         </Pressable>
       )}
     </View>
@@ -71,19 +72,19 @@ export function SearchField({
 
 const styles = StyleSheet.create({
   container: {
-    height: 40,
-    borderRadius: radius.md,
+    height: 42,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.sm,
-    marginBottom: spacing.md,
+    marginBottom: spacing.xs,
   },
   searchIcon: {
-    fontSize: 14,
     marginRight: spacing.xs,
   },
   input: {
+    fontFamily: typography.fontFamily.body,
     flex: 1,
     height: '100%',
     fontSize: typography.fontSize.sm,
@@ -91,9 +92,5 @@ const styles = StyleSheet.create({
   },
   clearButton: {
     padding: 4,
-  },
-  clearText: {
-    fontSize: 12,
-    fontWeight: 'bold',
   },
 });

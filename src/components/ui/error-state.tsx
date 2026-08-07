@@ -37,11 +37,12 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   title: {
+    fontFamily: typography.fontFamily.headingSemibold,
     fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold as '600',
     textAlign: 'center',
   },
   message: {
+    fontFamily: typography.fontFamily.body,
     fontSize: typography.fontSize.sm,
     textAlign: 'center',
   },

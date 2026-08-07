@@ -8,28 +8,50 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import { Edge, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  Edge,
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 
 import { semanticColors, spacing } from '@/shared/theme';
 
 export interface ScreenScaffoldProps {
   children: React.ReactNode;
+
   /**
-   * - 'standard': basic View container
-   * - 'scroll': standard ScrollView container
-   * - 'form': includes KeyboardAvoidingView and ScrollView optimized for inputs
+   * standard
+   * Basic non-scrollable View container
+   *
+   * scroll
+   * Standard ScrollView container
+   *
+   * form
+   * Keyboard-aware ScrollView optimized for forms
    */
   mode?: 'standard' | 'scroll' | 'form';
-  /** Optional header element to render inside the safe area scaffold. */
+
+  /** Optional header rendered inside the safe area */
   header?: React.ReactNode;
+
   /**
-   * Safe area edges to apply.
-   * Default: ['top', 'left', 'right'].
-   * Note: Tab screens typically do not need 'bottom' as the tab bar handles it.
+   * Safe-area edges applied to the screen
+   *
+   * Default
+   * top left right
+   *
+   * Tab screens normally do not require bottom because
+   * the native tab bar manages the bottom area
    */
   edges?: Edge[];
-  /** Add padding to the bottom to avoid the iOS floating tab bar (default: true) */
+
+  /**
+   * Adds additional space for the iOS floating native tab bar
+   *
+   * Default true
+   */
   avoidFloatingTabBar?: boolean;
+
   style?: ViewStyle;
   contentContainerStyle?: ViewStyle;
 }
@@ -47,33 +69,47 @@ export function ScreenScaffold({
   contentContainerStyle,
 }: ScreenScaffoldProps) {
   const colorScheme = useColorScheme();
-  const colors = semanticColors[colorScheme === 'dark' ? 'dark' : 'light'];
   const insets = useSafeAreaInsets();
+
+  const colors =
+    semanticColors[colorScheme === 'dark' ? 'dark' : 'light'];
+
+  const isForm = mode === 'form';
+  const isScrollable = mode === 'form' || mode === 'scroll';
 
   const extraBottomPadding =
     Platform.OS === 'ios' && avoidFloatingTabBar
       ? IOS_GLASS_TAB_BAR_HEIGHT +
-        IOS_GLASS_TAB_BAR_BOTTOM_MARGIN +
-        Math.max(insets.bottom, 8)
+      IOS_GLASS_TAB_BAR_BOTTOM_MARGIN +
+      Math.max(insets.bottom, spacing.sm)
       : 0;
 
   const containerStyle = [
     styles.container,
-    { backgroundColor: colors.background },
+    {
+      backgroundColor: colors.background,
+    },
     style,
   ];
 
-  const contentPadding = {
+  const contentPadding: ViewStyle = {
     padding: spacing.md,
     paddingBottom: spacing.md + extraBottomPadding,
   };
 
-  if (mode === 'form' || mode === 'scroll') {
-    const isForm = mode === 'form';
-    const content = (
+  if (isScrollable) {
+    const scrollContent = (
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, contentPadding, contentContainerStyle]}
-        keyboardShouldPersistTaps={isForm ? 'handled' : undefined}
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContent,
+          contentPadding,
+          contentContainerStyle,
+        ]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={
+          Platform.OS === 'ios' ? 'interactive' : 'none'
+        }
         showsVerticalScrollIndicator={false}
       >
         {children}
@@ -81,26 +117,46 @@ export function ScreenScaffold({
     );
 
     return (
-      <SafeAreaView style={containerStyle} edges={edges}>
+      <SafeAreaView
+        style={containerStyle}
+        edges={edges}
+      >
         {header}
+
         {isForm ? (
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={styles.flex}
+            behavior={
+              Platform.OS === 'ios'
+                ? 'padding'
+                : 'height'
+            }
+            keyboardVerticalOffset={0}
+            enabled
           >
-            {content}
+            {scrollContent}
           </KeyboardAvoidingView>
         ) : (
-          content
+          scrollContent
         )}
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={containerStyle} edges={edges}>
+    <SafeAreaView
+      style={containerStyle}
+      edges={edges}
+    >
       {header}
-      <View style={[styles.innerContainer, contentPadding, contentContainerStyle]}>
+
+      <View
+        style={[
+          styles.innerContainer,
+          contentPadding,
+          contentContainerStyle,
+        ]}
+      >
         {children}
       </View>
     </SafeAreaView>
@@ -111,12 +167,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+
   flex: {
     flex: 1,
   },
+
+  scrollView: {
+    flex: 1,
+  },
+
   scrollContent: {
     flexGrow: 1,
   },
+
   innerContainer: {
     flex: 1,
   },

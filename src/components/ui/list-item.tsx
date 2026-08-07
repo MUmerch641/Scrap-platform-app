@@ -33,7 +33,7 @@ export function ListItem({
         styles.container,
         {
           backgroundColor: colors.surface,
-          borderColor: isDark ? '#27272a' : '#e4e4e7',
+          borderColor: colors.border,
           opacity: pressed ? 0.9 : 1,
         },
       ]}
@@ -42,7 +42,7 @@ export function ListItem({
         <View style={styles.textColumn}>
           <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
           {subtitle && (
-            <Text style={[styles.subtitle, { color: isDark ? '#a1a1aa' : '#71717a' }]}>
+            <Text style={[styles.subtitle, { color: colors.textMuted }]}>
               {subtitle}
             </Text>
           )}
@@ -75,10 +75,11 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   title: {
+    fontFamily: typography.fontFamily.bodySemibold,
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold as '600',
   },
   subtitle: {
+    fontFamily: typography.fontFamily.body,
     fontSize: typography.fontSize.xs,
   },
   rightSlot: {

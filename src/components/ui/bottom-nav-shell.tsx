@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 
-import { semanticColors, spacing } from '@/shared/theme';
+import { semanticColors, spacing, typography } from '@/shared/theme';
 
 export interface TabItem {
   key: string;
@@ -26,14 +26,14 @@ export function BottomNavShell({ tabs, activeTab, onTabSelect }: BottomNavShellP
         styles.container,
         {
           backgroundColor: colors.surface,
-          borderTopColor: isDark ? '#27272a' : '#e4e4e7',
+          borderTopColor: colors.border,
         },
       ]}
     >
       {tabs.map((tab) => {
         const isActive = activeTab === tab.key;
-        const activeColor = colors.primary;
-        const inactiveColor = isDark ? '#71717a' : '#9ca3af';
+        const activeColor = colors.accent;
+        const inactiveColor = colors.textMuted;
 
         return (
           <Pressable
@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   label: {
+    fontFamily: typography.fontFamily.bodyMedium,
     fontSize: 11,
-    fontWeight: '500',
   },
 });

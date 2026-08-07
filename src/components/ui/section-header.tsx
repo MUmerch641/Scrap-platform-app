@@ -28,10 +28,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   title: {
+    fontFamily: typography.fontFamily.heading,
     fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold as '700',
   },
   subtitle: {
+    fontFamily: typography.fontFamily.body,
     fontSize: typography.fontSize.sm,
   },
 });

@@ -11,7 +11,12 @@ import {
 } from 'react-native';
 
 import { EyeIcon } from './eye-icon';
-import { radius, semanticColors, spacing, typography } from '@/shared/theme';
+import {
+  radius,
+  semanticColors,
+  spacing,
+  typography,
+} from '@/shared/theme';
 
 export interface FormInputProps extends RNTextInputProps {
   label: string;
@@ -20,30 +25,36 @@ export interface FormInputProps extends RNTextInputProps {
 }
 
 export const FormInput = forwardRef<RNTextInput, FormInputProps>(
-  ({ label, error, isPassword = false, style, onFocus, onBlur, ...props }, ref) => {
+  (
+    {
+      label,
+      error,
+      isPassword = false,
+      style,
+      onFocus,
+      onBlur,
+      secureTextEntry,
+      selectionColor,
+      ...props
+    },
+    ref
+  ) => {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
-    const colors = semanticColors[isDark ? 'dark' : 'light'];
     const isAndroid = Platform.OS === 'android';
 
-    const [isFocused, setIsFocused] = useState(false);
+    const colors = semanticColors[isDark ? 'dark' : 'light'];
 
+    const [isFocused, setIsFocused] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
-    const getBorderColor = () => {
-      if (error) return colors.danger;
-      if (isFocused) return colors.primary;
-      return isDark ? '#3f3f46' : '#d4d4d8';
-    };
+    const borderColor = error
+      ? colors.danger
+      : isFocused
+        ? colors.inputBorderFocused
+        : colors.inputBorder;
 
-    const getBackgroundColor = () => {
-      if (isAndroid) {
-        // Android uses a slightly elevated surface card feel
-        return isDark ? '#1f1f23' : '#f9fafb';
-      }
-      // iOS rounded filled field
-      return isDark ? '#1c1c1e' : '#f2f2f7';
-    };
+    const useAndroidLightStyle = isAndroid && !isDark;
 
     return (
       <View style={styles.container}>
@@ -51,63 +62,104 @@ export const FormInput = forwardRef<RNTextInput, FormInputProps>(
           style={[
             styles.label,
             {
-              color: isDark ? '#ababab' : '#3f3f46',
-              // Android label sits closer to the field, iOS has a bit more breathing room
-              marginBottom: isAndroid ? 4 : 6,
+              color: colors.text,
+              marginBottom: isAndroid ? spacing.xs : 6,
             },
           ]}
         >
           {label}
         </Text>
+
         <View
           style={[
             styles.inputWrapper,
-            isAndroid ? styles.inputWrapperAndroid : styles.inputWrapperIOS,
+            useAndroidLightStyle
+              ? styles.inputWrapperAndroidLight
+              : styles.inputWrapperOutlined,
             {
-              backgroundColor: getBackgroundColor(),
-              borderColor: getBorderColor(),
+              backgroundColor: colors.inputSurface,
+              borderColor,
             },
-            isFocused && !isAndroid && styles.inputWrapperFocusedIOS,
-            isFocused && isAndroid && { borderBottomWidth: 2, borderBottomColor: colors.primary },
+            isFocused &&
+            useAndroidLightStyle && {
+              borderBottomWidth: 2,
+              borderBottomColor: colors.inputBorderFocused,
+            },
+            isFocused &&
+            !isAndroid && [
+              styles.inputWrapperFocusedIOS,
+              {
+                shadowColor: colors.inputBorderFocused,
+              },
+            ],
           ]}
         >
           <RNTextInput
+            {...props}
             ref={ref}
             style={[
               styles.input,
-              { color: colors.text },
+              {
+                color: colors.inputText,
+              },
               style,
             ]}
-            placeholderTextColor={isDark ? '#636366' : '#aeaeb2'}
-            secureTextEntry={isPassword && !showPassword}
-            onFocus={(e) => {
+            placeholderTextColor={colors.inputPlaceholder}
+            selectionColor={
+              selectionColor ?? colors.inputBorderFocused
+            }
+            secureTextEntry={
+              isPassword ? !showPassword : secureTextEntry
+            }
+            onFocus={(event) => {
               setIsFocused(true);
-              onFocus?.(e);
+              onFocus?.(event);
             }}
-            onBlur={(e) => {
+            onBlur={(event) => {
               setIsFocused(false);
-              onBlur?.(e);
+              onBlur?.(event);
             }}
             underlineColorAndroid="transparent"
-            {...props}
           />
-          {isPassword && (
+
+          {isPassword ? (
             <Pressable
-              onPress={() => setShowPassword(!showPassword)}
+              onPress={() => {
+                setShowPassword((currentValue) => !currentValue);
+              }}
               hitSlop={12}
               accessibilityRole="button"
-              accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+              accessibilityLabel={
+                showPassword ? 'Hide password' : 'Show password'
+              }
               style={({ pressed }) => [
                 styles.eyeToggle,
-                pressed && { opacity: 0.5 },
+                {
+                  opacity: pressed
+                    ? 0.5
+                    : isDark
+                      ? 0.78
+                      : 1,
+                },
               ]}
             >
               <EyeIcon hidden={!showPassword} />
             </Pressable>
-          )}
+          ) : null}
         </View>
+
         {error ? (
-          <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
+          <Text
+            accessibilityLiveRegion="polite"
+            style={[
+              styles.errorText,
+              {
+                color: colors.danger,
+              },
+            ]}
+          >
+            {error}
+          </Text>
         ) : null}
       </View>
     );
@@ -118,51 +170,66 @@ FormInput.displayName = 'FormInput';
 
 const styles = StyleSheet.create({
   container: {
+    width: '100%',
     marginBottom: spacing.sm,
   },
+
   label: {
     fontSize: 13,
-    fontWeight: '500',
+    lineHeight: 18,
+    fontFamily: typography.fontFamily.bodyMedium,
     letterSpacing: -0.1,
   },
+
   inputWrapper: {
-    minHeight: 44,
+    width: '100%',
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
+    paddingLeft: spacing.md,
   },
-  // iOS: fully rounded outlined field with fill
-  inputWrapperIOS: {
+
+  inputWrapperOutlined: {
     borderWidth: 1,
     borderRadius: radius.lg,
   },
-  inputWrapperFocusedIOS: {
-    // subtle shadow on focus for iOS
-    shadowColor: '#2563eb',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-  },
-  // Android: bottom-border-only field (Material outlined feel)
-  inputWrapperAndroid: {
+
+  inputWrapperAndroidLight: {
     borderWidth: 0,
     borderBottomWidth: 1,
     borderRadius: radius.sm,
   },
+
+  inputWrapperFocusedIOS: {
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+  },
+
   input: {
     flex: 1,
-    minHeight: 44,
-    fontSize: typography.fontSize.sm,
+    minHeight: 48,
     paddingVertical: 0,
+    paddingRight: spacing.sm,
+    fontSize: typography.fontSize.sm,
+    lineHeight: typography.lineHeight.sm,
+    fontFamily: typography.fontFamily.body,
   },
+
   eyeToggle: {
-    minWidth: 44,
-    minHeight: 44,
+    width: 48,
+    minHeight: 48,
     justifyContent: 'center',
     alignItems: 'center',
   },
+
   errorText: {
-    fontSize: 12,
-    marginTop: 4,
+    marginTop: spacing.xs,
+    fontSize: typography.fontSize.xs,
+    lineHeight: typography.lineHeight.xs,
+    fontFamily: typography.fontFamily.body,
   },
 });

@@ -2,7 +2,7 @@ import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 
 import { PrimaryButton } from './primary-button';
-import { radius, semanticColors, spacing, typography } from '@/shared/theme';
+import { brandOverlays, radius, semanticColors, spacing, typography } from '@/shared/theme';
 
 interface ConfirmationDialogProps {
   visible: boolean;
@@ -41,13 +41,13 @@ export function ConfirmationDialog({
           style={[
             styles.dialog,
             {
-              backgroundColor: isDark ? '#18181b' : '#ffffff',
-              borderColor: isDark ? '#27272a' : '#e4e4e7',
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
             },
           ]}
         >
           <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-          <Text style={[styles.message, { color: isDark ? '#a1a1aa' : '#71717a' }]}>
+          <Text style={[styles.message, { color: colors.textMuted }]}>
             {message}
           </Text>
 
@@ -57,7 +57,7 @@ export function ConfirmationDialog({
               disabled={loading}
               style={[
                 styles.cancelButton,
-                { backgroundColor: isDark ? '#27272a' : '#f4f4f5' },
+                { backgroundColor: colors.surfaceSelected },
               ]}
             >
               <Text style={[styles.cancelText, { color: colors.text }]}>
@@ -81,7 +81,7 @@ export function ConfirmationDialog({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: brandOverlays.modalBackdrop,
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.lg,
@@ -95,10 +95,11 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   title: {
+    fontFamily: typography.fontFamily.headingSemibold,
     fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold as '600',
   },
   message: {
+    fontFamily: typography.fontFamily.body,
     fontSize: typography.fontSize.sm,
     lineHeight: 20,
   },
@@ -115,8 +116,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelText: {
+    fontFamily: typography.fontFamily.bodyMedium,
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium as '500',
   },
   confirmButton: {
     flex: 1,

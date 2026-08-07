@@ -1,37 +1,55 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "ProCopper Recycling",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/procopper-app-icon.png",
+    "backgroundColor": "#004162",
+    "primaryColor": "#004162",
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/procopper-app-icon.png",
+      "bundleIdentifier": "com.procopper.app"
     },
     "android": {
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#004162",
+        "foregroundImage": "./assets/images/procopper - siteicon.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.umerch.mobile"
+      "package": "com.procopper.app"
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/procopper - siteicon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#004162",
+          "image": "./assets/images/procopper - siteicon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-navigation-bar",
+        {
+          "enforceContrast": false,
+          "hidden": false,
+          "style": "dark"
+        }
+      ],
+      [
+        "expo-status-bar",
+        {
+          "hidden": false,
+          "style": "light"
         }
       ],
       "expo-secure-store",

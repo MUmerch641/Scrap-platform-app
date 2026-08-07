@@ -19,7 +19,7 @@ export function PageHeader({ title, subtitle, action }: PageHeaderProps) {
       <View style={styles.textContainer}>
         <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
         {subtitle && (
-          <Text style={[styles.subtitle, { color: isDark ? '#a1a1aa' : '#71717a' }]}>
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
             {subtitle}
           </Text>
         )}
@@ -42,11 +42,12 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   title: {
+    fontFamily: typography.fontFamily.heading,
     fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold as '700',
     letterSpacing: -0.3,
   },
   subtitle: {
+    fontFamily: typography.fontFamily.body,
     fontSize: typography.fontSize.xs,
     lineHeight: 18,
   },

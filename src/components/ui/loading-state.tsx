@@ -28,6 +28,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   text: {
+    fontFamily: typography.fontFamily.body,
     fontSize: typography.fontSize.sm,
   },
 });

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ScreenScaffold } from '@/components/ui/screen-scaffold';
 import {
   showInfoMessage,
+  showErrorMessage,
   showNativeActionSheet,
   showNativeConfirmation,
 } from '@/services/native-feedback-service';
@@ -20,9 +21,10 @@ export default function DriverProfileScreen() {
   const isDark = colorScheme === 'dark';
   const colors = semanticColors[isDark ? 'dark' : 'light'];
 
-  const doSignOut = () => {
-    signOut();
-    showInfoMessage('Signed out');
+  const doSignOut = async () => {
+    const result = await signOut();
+    if (result.success) showInfoMessage('Signed out');
+    else showErrorMessage(result.error || 'The session was cleared locally.', 'Sign out');
     router.replace('/(auth)/sign-in');
   };
 
@@ -32,13 +34,13 @@ export default function DriverProfileScreen() {
         'Sign Out',
         ['Sign Out', 'Cancel'],
         1, // cancelButtonIndex
-        () => doSignOut()
+        () => void doSignOut()
       );
     } else {
       showNativeConfirmation(
         'Sign Out',
         'Are you sure you want to sign out?',
-        doSignOut,
+        () => void doSignOut(),
         'Sign Out',
         'Cancel'
       );
@@ -53,7 +55,7 @@ export default function DriverProfileScreen() {
       <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text style={[styles.label, { color: colors.textMuted }]}>Account Role</Text>
         <Text style={[styles.value, { color: colors.text }]}>
-          {userProfile?.role ? userProfile.role.toUpperCase() : 'DRIVER'}
+          {userProfile?.role.toUpperCase()}
         </Text>
 
         {userProfile?.email && (
@@ -90,14 +92,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   label: {
+    fontFamily: typography.fontFamily.bodyMedium,
     fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.medium as '500',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   value: {
+    fontFamily: typography.fontFamily.bodySemibold,
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold as '600',
     marginTop: spacing.xs,
   },
   signOutButton: {

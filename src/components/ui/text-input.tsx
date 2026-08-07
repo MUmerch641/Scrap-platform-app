@@ -28,11 +28,7 @@ export function TextInput({
   const colorScheme = useColorScheme();
   const colors = semanticColors[colorScheme === 'dark' ? 'dark' : 'light'];
 
-  const borderColor = error
-    ? colors.danger
-    : colorScheme === 'dark'
-    ? '#3f3f46'
-    : '#d4d4d8';
+  const borderColor = error ? colors.danger : colors.border;
 
   return (
     <View style={styles.container}>
@@ -74,8 +70,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   label: {
+    fontFamily: typography.fontFamily.bodyMedium,
     fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.medium as '500',
   },
   inputWrapper: {
     height: 40,
@@ -86,6 +82,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   input: {
+    fontFamily: typography.fontFamily.body,
     flex: 1,
     height: '100%',
     fontSize: typography.fontSize.sm,
@@ -95,6 +92,7 @@ const styles = StyleSheet.create({
     marginLeft: spacing.xs,
   },
   helperText: {
+    fontFamily: typography.fontFamily.body,
     fontSize: typography.fontSize.xs,
   },
 });

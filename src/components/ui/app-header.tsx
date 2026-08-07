@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 
-import { semanticColors, spacing, typography } from '@/shared/theme';
+import { brandColors, semanticColors, spacing, typography } from '@/shared/theme';
 
 interface AppHeaderProps {
   title: string;
@@ -42,18 +42,18 @@ export function AppHeader({ title, subtitle, onBack, rightAction }: AppHeaderPro
                 : undefined
             }
           >
-            <Text style={[styles.backText, { color: colors.primary }]}>
+            <Text style={[styles.backText, { color: brandColors.lightCopper }]}>
               {Platform.OS === 'ios' ? '‹ Back' : '← Back'}
             </Text>
           </Pressable>
         )}
         <View style={styles.titleBlock}>
-          <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+          <Text style={[styles.title, { color: brandColors.white }]} numberOfLines={1}>
             {title}
           </Text>
           {subtitle && (
             <Text
-              style={[styles.subtitle, { color: isDark ? '#a1a1aa' : '#71717a' }]}
+              style={[styles.subtitle, { color: brandColors.offWhite }]}
               numberOfLines={1}
             >
               {subtitle}
@@ -73,13 +73,12 @@ export function AppHeader({ title, subtitle, onBack, rightAction }: AppHeaderPro
       return (
         <GlassView
           glassEffectStyle="regular"
-          colorScheme={isDark ? 'dark' : 'light'}
+          colorScheme="dark"
+          tintColor={brandColors.navy}
           style={[
             styles.container,
             {
-              borderBottomColor: isDark
-                ? 'rgba(255,255,255,0.08)'
-                : 'rgba(0,0,0,0.07)',
+              borderBottomColor: brandColors.lightCopper,
             },
           ]}
         >
@@ -94,10 +93,8 @@ export function AppHeader({ title, subtitle, onBack, rightAction }: AppHeaderPro
         style={[
           styles.container,
           {
-            backgroundColor: isDark ? 'rgba(28,28,30,0.94)' : 'rgba(242,242,247,0.94)',
-            borderBottomColor: isDark
-              ? 'rgba(255,255,255,0.08)'
-              : 'rgba(0,0,0,0.07)',
+            backgroundColor: brandColors.navy,
+            borderBottomColor: brandColors.lightCopper,
           },
         ]}
       >
@@ -112,8 +109,8 @@ export function AppHeader({ title, subtitle, onBack, rightAction }: AppHeaderPro
       style={[
         styles.container,
         {
-          backgroundColor: colors.surface,
-          borderBottomColor: colors.border,
+          backgroundColor: brandColors.navy,
+          borderBottomColor: brandColors.lightCopper,
           elevation: 4,
         },
       ]}
@@ -153,14 +150,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backText: {
+    fontFamily: typography.fontFamily.bodySemibold,
     fontSize: typography.fontSize.md,
-    fontWeight: '600',
   },
   title: {
+    fontFamily: typography.fontFamily.headingSemibold,
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold as '600',
   },
   subtitle: {
+    fontFamily: typography.fontFamily.body,
     fontSize: typography.fontSize.xs,
   },
   rightContainer: {

@@ -1,13 +1,18 @@
-import React from 'react';
 import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  ViewStyle,
+    ActivityIndicator,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    useColorScheme,
+    ViewStyle,
 } from 'react-native';
+import Animated, {
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+} from 'react-native-reanimated';
+
 import { radius, semanticColors, spacing, typography } from '@/shared/theme';
 
 interface ButtonProps {
@@ -18,6 +23,8 @@ interface ButtonProps {
   loading?: boolean;
   style?: ViewStyle;
 }
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function Button({
   title,
@@ -31,47 +38,63 @@ export function Button({
   const isDark = colorScheme === 'dark';
   const colors = semanticColors[isDark ? 'dark' : 'light'];
 
-  const getBackgroundColor = (pressed: boolean) => {
+  // ── Spring scale on press — runs on the UI thread via Reanimated ──────────
+  const isPressed = useSharedValue(false);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        scale: withSpring(isPressed.value ? 0.96 : 1, {
+          mass: 0.4,
+          stiffness: isPressed.value ? 320 : 260,
+          damping: isPressed.value ? 20 : 18,
+        }),
+      },
+    ],
+  }));
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const getBackgroundColor = () => {
     if (disabled) return colors.surfaceSelected;
-    if (variant === 'primary') return pressed && Platform.OS === 'ios' ? '#1d4ed8' : colors.primary;
-    if (variant === 'secondary') return pressed && Platform.OS === 'ios' ? colors.surfaceSelected : colors.surface;
+    if (variant === 'primary') return colors.primary;
+    if (variant === 'secondary') return colors.surface;
     return 'transparent';
   };
 
   const getTextColor = () => {
     if (disabled) return colors.textMuted;
-    if (variant === 'primary') return '#ffffff';
+    if (variant === 'primary') return colors.onPrimary;
     if (variant === 'secondary') return colors.text;
     return colors.primary;
   };
 
   const borderStyle: ViewStyle =
-    variant === 'outline'
+    variant === 'outline' || variant === 'secondary'
       ? { borderWidth: 1, borderColor: disabled ? colors.border : colors.primary }
       : {};
 
-  // Android: use a ripple overlay via the `android_ripple` prop
-  // iOS: use opacity-based press feedback
-  const androidRipple = Platform.OS === 'android'
-    ? {
-        color: variant === 'primary' ? 'rgba(255,255,255,0.2)' : colors.surfaceSelected,
-        borderless: false,
-      }
-    : undefined;
+  const androidRipple =
+    Platform.OS === 'android'
+      ? {
+          color: variant === 'primary' ? 'rgba(255,255,255,0.2)' : colors.surfaceSelected,
+          borderless: false,
+        }
+      : undefined;
 
   return (
-    <Pressable
+    <AnimatedPressable
       onPress={onPress}
+      onPressIn={() => { isPressed.value = true; }}
+      onPressOut={() => { isPressed.value = false; }}
       disabled={disabled || loading}
       accessibilityRole="button"
       accessibilityLabel={title}
       android_ripple={androidRipple}
-      style={({ pressed }) => [
+      style={[
         styles.button,
-        { backgroundColor: getBackgroundColor(pressed) },
+        { backgroundColor: getBackgroundColor() },
         borderStyle,
-        // iOS opacity feedback; Android uses ripple so no opacity change
-        Platform.OS === 'ios' && pressed && { opacity: 0.75 },
+        animatedStyle,
         style,
       ]}
     >
@@ -80,7 +103,7 @@ export function Button({
       ) : (
         <Text style={[styles.text, { color: getTextColor() }]}>{title}</Text>
       )}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -93,10 +116,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     flexDirection: 'row',
-    overflow: 'hidden', // required for Android ripple to be clipped to border radius
+    overflow: 'hidden',
   },
   text: {
+    fontFamily: typography.fontFamily.bodySemibold,
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold as '600',
   },
 });

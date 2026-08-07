@@ -8,7 +8,7 @@ import {
   useColorScheme,
   ViewStyle,
 } from 'react-native';
-import { radius, semanticColors, typography } from '@/shared/theme';
+import { brandColors, radius, semanticColors, typography } from '@/shared/theme';
 
 interface PrimaryButtonProps {
   title: string;
@@ -49,7 +49,7 @@ export function PrimaryButton({
       style={({ pressed }) => [
         styles.button,
         {
-          backgroundColor: disabled ? '#3f3f46' : colors.primary,
+          backgroundColor: disabled ? colors.surfaceSelected : colors.primary,
           // iOS: opacity + subtle scale on press; Android: ripple handles feedback
           opacity: Platform.OS === 'ios' && pressed ? 0.82 : 1,
           transform: Platform.OS === 'ios' && pressed ? [{ scale: 0.982 }] : undefined,
@@ -58,9 +58,9 @@ export function PrimaryButton({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color="#ffffff" size="small" />
+        <ActivityIndicator color={colors.onPrimary} size="small" />
       ) : (
-        <Text style={styles.text}>{title}</Text>
+        <Text style={[styles.text, { color: colors.onPrimary }]}>{title}</Text>
       )}
     </Pressable>
   );
@@ -75,16 +75,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     overflow: 'hidden',
     // Subtle shadow (iOS only — elevation is handled separately via platform)
-    shadowColor: '#2563eb',
+    shadowColor: brandColors.copper,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 2,
   },
   text: {
-    color: '#ffffff',
+    fontFamily: typography.fontFamily.bodySemibold,
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold as '600',
     letterSpacing: -0.1,
   },
 });
