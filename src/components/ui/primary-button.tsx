@@ -1,14 +1,13 @@
-import React from 'react';
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  ViewStyle,
-} from 'react-native';
 import { brandColors, radius, semanticColors, typography } from '@/shared/theme';
+import {
+    ActivityIndicator,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    useColorScheme,
+    ViewStyle,
+} from 'react-native';
 
 interface PrimaryButtonProps {
   title: string;
@@ -50,10 +49,9 @@ export function PrimaryButton({
         styles.button,
         {
           backgroundColor: disabled ? colors.surfaceSelected : colors.primary,
-          // iOS: opacity + subtle scale on press; Android: ripple handles feedback
-          opacity: Platform.OS === 'ios' && pressed ? 0.82 : 1,
-          transform: Platform.OS === 'ios' && pressed ? [{ scale: 0.982 }] : undefined,
         },
+        // iOS press feedback — scale + opacity. Android uses ripple.
+        Platform.OS === 'ios' && pressed && styles.pressedIOS,
         style,
       ]}
     >
@@ -85,5 +83,10 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.bodySemibold,
     fontSize: typography.fontSize.sm,
     letterSpacing: -0.1,
+  },
+  // Applied only on iOS when pressed — keeps transform key absent when not pressing
+  pressedIOS: {
+    opacity: 0.82,
+    transform: [{ scale: 0.982 }],
   },
 });
