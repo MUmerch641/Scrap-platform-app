@@ -10,7 +10,8 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated';
 
-import { useUserRole } from '@/app/context/UserRoleContext';
+import { useUserRole } from '@/context/UserRoleContext';
+import { useAppDialog } from '@/context/AppDialogContext';
 import { AppHeader } from '@/components/ui/app-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -21,7 +22,6 @@ import {
     showErrorMessage,
     showInfoMessage,
     showNativeActionSheet,
-    showNativeConfirmation,
 } from '@/services/native-feedback-service';
 import { ROLES } from '@/shared/roles';
 import { brandColors, radius, semanticColors, spacing, typography } from '@/shared/theme';
@@ -127,6 +127,7 @@ function InfoRow({ label, value, noBorder = false }: InfoRowProps) {
 export default function SalesRepProfileScreen() {
   const router      = useRouter();
   const { userProfile, signOut } = useUserRole();
+  const { showDialog } = useAppDialog();
   const colorScheme = useColorScheme();
   const isDark      = colorScheme === 'dark';
   const colors      = semanticColors[isDark ? 'dark' : 'light'];
@@ -199,13 +200,16 @@ export default function SalesRepProfileScreen() {
         () => void doSignOut()
       );
     } else {
-      showNativeConfirmation(
-        'Sign Out',
-        'Are you sure you want to sign out?',
-        () => void doSignOut(),
-        'Sign Out',
-        'Cancel'
-      );
+      showDialog({
+        title: 'Sign out',
+        message: 'Are you sure you want to sign out?',
+        confirmLabel: 'Sign Out',
+        cancelLabel: 'Cancel',
+        destructive: true,
+        icon: 'log-out-outline',
+        dismissible: false,
+        onConfirm: doSignOut,
+      });
     }
   };
   // ──────────────────────────────────────────────────────────────────────────

@@ -1,6 +1,5 @@
 import { brandColors, radius, semanticColors, typography } from '@/shared/theme';
 import {
-    ActivityIndicator,
     Platform,
     Pressable,
     StyleSheet,
@@ -8,6 +7,8 @@ import {
     useColorScheme,
     ViewStyle,
 } from 'react-native';
+
+import { BrandSpinner, BUTTON_LOADER_SIZE } from '@/components/ui/loading-state';
 
 interface PrimaryButtonProps {
   title: string;
@@ -56,7 +57,10 @@ export function PrimaryButton({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={colors.onPrimary} size="small" />
+        <BrandSpinner
+          size={BUTTON_LOADER_SIZE}
+          accessibilityLabel={`${title} in progress`}
+        />
       ) : (
         <Text style={[styles.text, { color: colors.onPrimary }]}>{title}</Text>
       )}

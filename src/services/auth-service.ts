@@ -24,7 +24,7 @@ export interface UserProfile {
   updatedAt: string;
 }
 
-export type MobileRoute = '/(driver)' | '/(sales-rep)';
+export type MobileRoute = '/(driver)' | '/(sales-rep)/(home)';
 
 export interface AuthActionResult {
   success: boolean;
@@ -43,7 +43,7 @@ export const PASSWORD_RECOVERY_REDIRECT_URL = Linking.createURL('reset-password'
 
 export function getMobileRouteForRole(role: Role): MobileRoute | null {
   if (role === ROLES.DRIVER) return '/(driver)';
-  if (role === ROLES.SALES_REP) return '/(sales-rep)';
+  if (role === ROLES.SALES_REP) return '/(sales-rep)/(home)';
   return null;
 }
 

@@ -14,6 +14,7 @@ interface SearchFieldProps {
   onChangeText: (text: string) => void;
   placeholder?: string;
   onClear?: () => void;
+  compact?: boolean;
 }
 
 export function SearchField({
@@ -21,6 +22,7 @@ export function SearchField({
   onChangeText,
   placeholder = 'Search...',
   onClear,
+  compact = false,
 }: SearchFieldProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -30,6 +32,7 @@ export function SearchField({
     <View
       style={[
         styles.container,
+        compact && styles.containerCompact,
         {
           backgroundColor: colors.inputSurface,
           borderColor: colors.inputBorder,
@@ -38,7 +41,7 @@ export function SearchField({
     >
       <Ionicons
         name="search-outline"
-        size={16}
+        size={compact ? 15 : 16}
         color={colors.textMuted}
         style={styles.searchIcon}
       />
@@ -47,7 +50,11 @@ export function SearchField({
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.inputPlaceholder}
-        style={[styles.input, { color: colors.inputText }]}
+        style={[
+          styles.input,
+          compact && styles.inputCompact,
+          { color: colors.inputText },
+        ]}
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"
@@ -80,6 +87,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     marginBottom: spacing.xs,
   },
+  containerCompact: {
+    height: 38,
+    borderRadius: radius.md,
+    marginBottom: 0,
+  },
   searchIcon: {
     marginRight: spacing.xs,
   },
@@ -89,6 +101,9 @@ const styles = StyleSheet.create({
     height: '100%',
     fontSize: typography.fontSize.sm,
     paddingVertical: 0,
+  },
+  inputCompact: {
+    fontSize: 13,
   },
   clearButton: {
     padding: 4,

@@ -3,7 +3,7 @@ import * as Linking from 'expo-linking';
 import { StyleSheet, Text, TextInput as RNTextInput, useColorScheme } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { useUserRole } from '@/app/context/UserRoleContext';
+import { useUserRole } from '@/context/UserRoleContext';
 import { BrandHeader } from '@/components/ui/brand-header';
 import { FormInput } from '@/components/ui/form-input';
 import { PrimaryButton } from '@/components/ui/primary-button';

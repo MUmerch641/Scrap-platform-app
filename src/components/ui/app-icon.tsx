@@ -27,6 +27,7 @@ export type AppIconName =
   | 'log-out-outline'
   | 'shield-checkmark-outline'
   | 'checkmark-circle-outline'
+  | 'create-outline'
   | 'close-circle-outline'
   | 'alert-circle-outline'
   | 'chevron-forward'

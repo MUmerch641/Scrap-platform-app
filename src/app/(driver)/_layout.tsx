@@ -1,4 +1,4 @@
-import { useUserRole } from '@/app/context/UserRoleContext';
+import { useUserRole } from '@/context/UserRoleContext';
 import { AuthLoadingScreen } from '@/components/auth/auth-loading-screen';
 import { ROLES } from '@/shared/roles';
 import { semanticColors, typography } from '@/shared/theme';
@@ -15,7 +15,7 @@ export default function DriverLayout() {
   if (isInitialLoading) return <AuthLoadingScreen />;
   if (!session) return <Redirect href="/(auth)/sign-in" />;
   if (role !== ROLES.DRIVER) {
-    return <Redirect href={role === ROLES.SALES_REP ? '/(sales-rep)' : '/(auth)/sign-in'} />;
+    return <Redirect href={role === ROLES.SALES_REP ? '/(sales-rep)/(home)' : '/(auth)/sign-in'} />;
   }
 
   return (

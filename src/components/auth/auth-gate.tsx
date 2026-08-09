@@ -1,7 +1,7 @@
 import React from 'react';
 import { Href, useRouter, useSegments } from 'expo-router';
 
-import { routeForAuthenticatedRole, useUserRole } from '@/app/context/UserRoleContext';
+import { routeForAuthenticatedRole, useUserRole } from '@/context/UserRoleContext';
 import { AuthLoadingScreen } from '@/components/auth/auth-loading-screen';
 
 export function AuthGate({ children }: { children: React.ReactNode }) {

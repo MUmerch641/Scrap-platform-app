@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
 
-import { routeForAuthenticatedRole, useUserRole } from '@/app/context/UserRoleContext';
+import { routeForAuthenticatedRole, useUserRole } from '@/context/UserRoleContext';
 import { AuthLoadingScreen } from '@/components/auth/auth-loading-screen';
 
 export default function Index() {

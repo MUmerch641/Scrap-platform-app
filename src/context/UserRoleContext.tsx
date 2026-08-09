@@ -1,5 +1,11 @@
-import type { Session, User } from '@supabase/supabase-js';
+import {
+  isAuthApiError,
+  isAuthRetryableFetchError,
+  type Session,
+  type User,
+} from '@supabase/supabase-js';
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 import {
   AuthActionResult,
@@ -41,14 +47,24 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const mountedRef = useRef(false);
+  const currentSessionRef = useRef<Session | null>(null);
   const signInInProgressRef = useRef(false);
   const pendingProfileRef = useRef<{
     userId: string;
     promise: Promise<ProfileLoadResult>;
   } | null>(null);
+  const pendingHydrationRef = useRef<{
+    userId: string;
+    promise: Promise<AuthActionResult>;
+  } | null>(null);
+  const foregroundValidationRef = useRef<Promise<void> | null>(null);
+  const validationEpochRef = useRef(0);
 
   const clearLocalState = useCallback(() => {
     if (!mountedRef.current) return;
+    validationEpochRef.current += 1;
+    pendingHydrationRef.current = null;
+    currentSessionRef.current = null;
     setSession(null);
     setUser(null);
     setUserProfile(null);
@@ -70,19 +86,25 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
 
   const rejectAccess = useCallback(
     async (message: string, publishError: boolean, clearStoredSession: boolean) => {
-      if (clearStoredSession) await signOutLocally();
+      // Remove protected routes and their screen-local data before any network work.
       clearLocalState();
       if (mountedRef.current) {
         if (publishError) setAuthError(message);
         setIsInitialLoading(false);
       }
+      if (clearStoredSession) await signOutLocally();
       return { success: false, error: message } satisfies AuthActionResult;
     },
     [clearLocalState]
   );
 
-  const hydrateSession = useCallback(
-    async (restoredSession: Session, publishError: boolean): Promise<AuthActionResult> => {
+  const performSessionHydration = useCallback(
+    async (
+      restoredSession: Session,
+      publishError: boolean,
+      preserveOnUnavailable: boolean,
+      validationEpoch: number,
+    ): Promise<AuthActionResult> => {
       if (supabaseConfigurationError) {
         return rejectAccess(supabaseConfigurationError, publishError, false);
       }
@@ -91,16 +113,45 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
         const { data, error } = await supabase.auth.getUser();
         const authenticatedUser = data.user;
 
-        if (error || !authenticatedUser || authenticatedUser.id !== restoredSession.user.id) {
+        if (validationEpoch !== validationEpochRef.current) {
+          return { success: false, error: 'Session validation was superseded.' };
+        }
+
+        if (error) {
+          const isTemporaryFailure =
+            isAuthRetryableFetchError(error) ||
+            (isAuthApiError(error) && (error.status === 429 || error.status >= 500));
+
+          if (preserveOnUnavailable && isTemporaryFailure) {
+            return {
+              success: false,
+              error: 'Unable to revalidate account access right now.',
+            };
+          }
+
           return rejectAccess(
             'Unable to verify the signed-in account. Check your connection and try again.',
             publishError,
-            false
+            true
+          );
+        }
+
+        if (!authenticatedUser || authenticatedUser.id !== restoredSession.user.id) {
+          return rejectAccess(
+            'Unable to verify the signed-in account. Please sign in again.',
+            publishError,
+            true
           );
         }
 
         const profileResult = await getProfileOnce(authenticatedUser);
+        if (validationEpoch !== validationEpochRef.current) {
+          return { success: false, error: 'Session validation was superseded.' };
+        }
         if (!profileResult.success) {
+          if (preserveOnUnavailable && profileResult.reason === 'unavailable') {
+            return { success: false, error: profileResult.error };
+          }
           const shouldSignOut = profileResult.reason !== 'unavailable';
           return rejectAccess(profileResult.error, publishError, shouldSignOut);
         }
@@ -120,6 +171,7 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
         }
 
         if (mountedRef.current) {
+          currentSessionRef.current = restoredSession;
           setSession(restoredSession);
           setUser(authenticatedUser);
           setUserProfile(profileResult.profile);
@@ -129,6 +181,15 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
 
         return { success: true, session: restoredSession, route };
       } catch {
+        if (validationEpoch !== validationEpochRef.current) {
+          return { success: false, error: 'Session validation was superseded.' };
+        }
+        if (preserveOnUnavailable) {
+          return {
+            success: false,
+            error: 'Unable to revalidate account access right now.',
+          };
+        }
         return rejectAccess(
           'Unable to verify account access. Check your connection and try again.',
           publishError,
@@ -139,9 +200,78 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
     [getProfileOnce, rejectAccess]
   );
 
+  const hydrateSession = useCallback(
+    (
+      restoredSession: Session,
+      publishError: boolean,
+      preserveOnUnavailable = false,
+    ): Promise<AuthActionResult> => {
+      const pending = pendingHydrationRef.current;
+      if (pending?.userId === restoredSession.user.id) return pending.promise;
+      if (pending) {
+        validationEpochRef.current += 1;
+        pendingHydrationRef.current = null;
+      }
+
+      const validationEpoch = validationEpochRef.current;
+
+      const promise = performSessionHydration(
+        restoredSession,
+        publishError,
+        preserveOnUnavailable,
+        validationEpoch,
+      );
+      pendingHydrationRef.current = { userId: restoredSession.user.id, promise };
+      void promise.finally(() => {
+        if (pendingHydrationRef.current?.promise === promise) {
+          pendingHydrationRef.current = null;
+        }
+      });
+      return promise;
+    },
+    [performSessionHydration],
+  );
+
+  const revalidateForegroundSession = useCallback((): Promise<void> => {
+    if (!currentSessionRef.current) return Promise.resolve();
+    if (foregroundValidationRef.current) return foregroundValidationRef.current;
+
+    const promise = (async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) return;
+
+        if (!data.session) {
+          await rejectAccess('Your session has expired. Please sign in again.', true, true);
+          return;
+        }
+
+        await hydrateSession(data.session, true, true);
+      } catch {
+        // A transient foreground connectivity failure must not expose or destroy tokens.
+        // RLS remains authoritative, and the next foreground/token event retries validation.
+      }
+    })();
+
+    foregroundValidationRef.current = promise;
+    void promise.finally(() => {
+      if (foregroundValidationRef.current === promise) {
+        foregroundValidationRef.current = null;
+      }
+    });
+    return promise;
+  }, [hydrateSession, rejectAccess]);
+
   useEffect(() => {
     mountedRef.current = true;
     const unregisterAutoRefresh = registerSupabaseAutoRefresh();
+    let previousAppState = AppState.currentState;
+
+    const foregroundSubscription = AppState.addEventListener('change', (nextState) => {
+      const returnedToForeground = previousAppState !== 'active' && nextState === 'active';
+      previousAppState = nextState;
+      if (returnedToForeground) void revalidateForegroundSession();
+    });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (event === 'INITIAL_SESSION') return;
@@ -153,10 +283,7 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (event === 'TOKEN_REFRESHED') {
-        if (mountedRef.current) {
-          setSession(nextSession);
-          setUser(nextSession.user);
-        }
+        setTimeout(() => void hydrateSession(nextSession, true, true), 0);
         return;
       }
 
@@ -202,9 +329,10 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       mountedRef.current = false;
       authListener.subscription.unsubscribe();
+      foregroundSubscription.remove();
       unregisterAutoRefresh();
     };
-  }, [clearLocalState, hydrateSession, rejectAccess]);
+  }, [clearLocalState, hydrateSession, rejectAccess, revalidateForegroundSession]);
 
   const signIn = useCallback(
     async (email: string, password: string): Promise<AuthActionResult> => {

@@ -1,7 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   ListRenderItemInfo,
   Modal,
@@ -26,23 +25,34 @@ import { AppIcon } from '@/components/ui/app-icon';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FormInput } from '@/components/ui/form-input';
+import {
+  BrandSpinner,
+  CONTENT_LOADER_SIZE,
+  LoadingState,
+} from '@/components/ui/loading-state';
 import { ScreenScaffold } from '@/components/ui/screen-scaffold';
 import { SearchField } from '@/components/ui/search-field';
 import {
   Customer,
-  fetchCustomers,
   fetchCustomersPage,
 } from '@/services/customer-service';
 import {
   showErrorMessage,
   showInfoMessage,
 } from '@/services/native-feedback-service';
-import { createPickupRequest } from '@/services/pickup-service';
+import {
+  createPickupRequest,
+  findPickupByClientRequestId,
+  formatLocalCalendarDate,
+  MATERIAL_OPTIONS,
+  parseEstimatedWeightInput,
+  validatePickupRequestInput,
+} from '@/services/pickup-service';
+import { createClientRequestId } from '@/shared/client-request-id';
 import { radius, semanticColors, spacing, typography } from '@/shared/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const MATERIAL_OPTIONS = ['Copper', 'Brass', 'Aluminum', 'Heavy Iron', 'Mixed Scrap'];
 const SELECTOR_PAGE_SIZE = 30;
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -101,29 +111,58 @@ function CustomerSelectorModal({ visible, onClose, onSelect }: CustomerSelectorM
   const [loading,     setLoading]     = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore,     setHasMore]     = useState(false);
+  const [loadError,   setLoadError]   = useState<string | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
 
   const pageRef           = useRef(0);
   const activeSearchRef   = useRef('');
   const debounceRef       = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isMountedRef      = useRef(false);
+  const requestSequenceRef = useRef(0);
+  const isLoadingMoreRef = useRef(false);
   // Track the last visibility value so we only trigger on rising edge (false→true)
   const prevVisibleRef    = useRef(false);
 
   // Load a page of customers into the selector
   const loadPage = useCallback(async (term: string, page: number, append: boolean) => {
+    const requestSequence = ++requestSequenceRef.current;
     if (page === 0) setLoading(true);
-    else setLoadingMore(true);
+    else {
+      isLoadingMoreRef.current = true;
+      setLoadingMore(true);
+    }
+
+    if (append) setLoadMoreError(null);
+    else setLoadError(null);
 
     const result = await fetchCustomersPage(term, page, SELECTOR_PAGE_SIZE);
 
+    if (requestSequence !== requestSequenceRef.current) return;
+
     setLoading(false);
     setLoadingMore(false);
+    isLoadingMoreRef.current = false;
 
-    if (!result.success) return;
+    if (!result.success) {
+      const message = result.error ?? 'Failed to load customers.';
+      if (append) setLoadMoreError(message);
+      else {
+        setCustomers([]);
+        setHasMore(false);
+        setLoadError(message);
+      }
+      return;
+    }
 
     pageRef.current = page;
     setHasMore(result.hasMore);
-    setCustomers(prev => append ? [...prev, ...result.customers] : result.customers);
+    setCustomers((previous) => {
+      if (!append) return result.customers;
+      const existingIds = new Set(previous.map((customer) => customer.id));
+      return [
+        ...previous,
+        ...result.customers.filter((customer) => !existingIds.has(customer.id)),
+      ];
+    });
   }, []);
 
   // Trigger reset+load only on the rising edge (modal just opened).
@@ -131,7 +170,12 @@ function CustomerSelectorModal({ visible, onClose, onSelect }: CustomerSelectorM
   React.useEffect(() => {
     const justOpened = visible && !prevVisibleRef.current;
     prevVisibleRef.current = visible;
-    isMountedRef.current = visible;
+
+    if (!visible) {
+      requestSequenceRef.current += 1;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      return;
+    }
 
     if (!justOpened) return;
 
@@ -139,23 +183,32 @@ function CustomerSelectorModal({ visible, onClose, onSelect }: CustomerSelectorM
     const reset = async () => {
       setSearch('');
       setCustomers([]);
+      setLoadError(null);
+      setLoadMoreError(null);
       activeSearchRef.current = '';
       await loadPage('', 0, false);
     };
     void reset();
   }, [visible, loadPage]);
 
+  React.useEffect(() => () => {
+    requestSequenceRef.current += 1;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  }, []);
+
   const handleSearchChange = (text: string) => {
     setSearch(text);
+    requestSequenceRef.current += 1;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      activeSearchRef.current = text;
-      void loadPage(text, 0, false);
+      const normalizedSearch = text.trim();
+      activeSearchRef.current = normalizedSearch;
+      void loadPage(normalizedSearch, 0, false);
     }, SEARCH_DEBOUNCE_MS);
   };
 
   const handleLoadMore = () => {
-    if (loadingMore || !hasMore) return;
+    if (isLoadingMoreRef.current || loadingMore || !hasMore) return;
     void loadPage(activeSearchRef.current, pageRef.current + 1, true);
   };
 
@@ -170,7 +223,7 @@ function CustomerSelectorModal({ visible, onClose, onSelect }: CustomerSelectorM
         },
       ]}
       accessibilityRole="button"
-      accessibilityLabel={`Select ${item.name}`}
+      accessibilityLabel={`Select ${item.name}, phone ${item.phone}, address ${item.address}`}
     >
       <View style={styles.selectorRowContent}>
         <Text style={[styles.selectorName, { color: colors.text }]} numberOfLines={1}>
@@ -193,7 +246,14 @@ function CustomerSelectorModal({ visible, onClose, onSelect }: CustomerSelectorM
 
   const listFooter = loadingMore ? (
     <View style={styles.selectorFooterLoader}>
-      <ActivityIndicator size="small" color={colors.primary} />
+      <BrandSpinner size={24} accessibilityLabel="Loading more customers" />
+    </View>
+  ) : loadMoreError ? (
+    <View style={styles.selectorFooterError}>
+      <Text style={[styles.selectorErrorText, { color: colors.danger }]}>
+        {loadMoreError}
+      </Text>
+      <Button title="Retry" variant="outline" onPress={handleLoadMore} />
     </View>
   ) : null;
 
@@ -233,7 +293,21 @@ function CustomerSelectorModal({ visible, onClose, onSelect }: CustomerSelectorM
         {/* List */}
         {loading ? (
           <View style={styles.selectorLoading}>
-            <ActivityIndicator size="large" color={colors.primary} />
+            <BrandSpinner
+              size={CONTENT_LOADER_SIZE}
+              accessibilityLabel="Loading customers"
+            />
+          </View>
+        ) : loadError ? (
+          <View style={styles.selectorLoading}>
+            <Text style={[styles.selectorErrorText, { color: colors.danger }]}>
+              {loadError}
+            </Text>
+            <Button
+              title="Retry"
+              variant="outline"
+              onPress={() => void loadPage(activeSearchRef.current, 0, false)}
+            />
           </View>
         ) : (
           <FlatList
@@ -242,7 +316,7 @@ function CustomerSelectorModal({ visible, onClose, onSelect }: CustomerSelectorM
             renderItem={renderItem}
             ListEmptyComponent={
               <Text style={[styles.selectorEmpty, { color: colors.textMuted }]}>
-                {search ? `No customers match "${search}"` : 'No customers found.'}
+                {search.trim() ? `No customers match "${search.trim()}"` : 'No customers found.'}
               </Text>
             }
             ListFooterComponent={listFooter}
@@ -317,15 +391,16 @@ function CustomerSelectorField({ selected, onPress, colors }: CustomerSelectorFi
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getTodayString(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return formatLocalCalendarDate(new Date());
 }
 
 function getTomorrowString(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return formatLocalCalendarDate(tomorrow);
 }
+
+type CustomerAvailability = 'loading' | 'available' | 'empty' | 'error';
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function CreatePickupScreen() {
@@ -337,8 +412,10 @@ export default function CreatePickupScreen() {
   // Customer selector state
   const [selectedCustomer,    setSelectedCustomer]    = useState<Customer | null>(null);
   const [selectorVisible,     setSelectorVisible]     = useState(false);
-  const [hasAnyCustomers,     setHasAnyCustomers]     = useState<boolean | null>(null); // null = loading
-  const hasAutoSelectedRef    = useRef(false);
+  const [customerAvailability, setCustomerAvailability] =
+    useState<CustomerAvailability>('loading');
+  const [checkingCustomers, setCheckingCustomers] = useState(false);
+  const customerAvailabilityRequestRef = useRef(0);
 
   // Form state
   const [pickupAddress,   setPickupAddress]   = useState('');
@@ -350,33 +427,40 @@ export default function CreatePickupScreen() {
   const [submitting,      setSubmitting]      = useState(false);
   const [formError,       setFormError]       = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
+  const pickupAttemptRef = useRef<{
+    clientRequestId: string;
+    fingerprint: string;
+    attempted: boolean;
+  } | null>(null);
 
-  // On focus: check whether there are any customers at all (for empty state)
-  // and auto-select the first one once on first load.
+  // This bounded one-row check supports the empty state without loading the directory.
   const checkCustomers = useCallback(async () => {
-    const result = await fetchCustomers();
+    const requestSequence = ++customerAvailabilityRequestRef.current;
+    setCheckingCustomers(true);
+    const result = await fetchCustomersPage('', 0, 1);
+    if (requestSequence !== customerAvailabilityRequestRef.current) return;
+
+    setCheckingCustomers(false);
     if (result.success) {
-      setHasAnyCustomers(result.customers.length > 0);
-      if (result.customers.length > 0 && !hasAutoSelectedRef.current) {
-        hasAutoSelectedRef.current = true;
-        const first = result.customers[0];
-        setSelectedCustomer(first);
-        setPickupAddress(first.address);
-      }
+      setCustomerAvailability(result.customers.length > 0 ? 'available' : 'empty');
     } else {
-      setHasAnyCustomers(false);
+      setCustomerAvailability('error');
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       void checkCustomers();
+      return () => {
+        customerAvailabilityRequestRef.current += 1;
+      };
     }, [checkCustomers])
   );
 
   const handleCustomerSelected = (customer: Customer) => {
     setSelectedCustomer(customer);
     setPickupAddress(customer.address);
+    setFormError(null);
     setSelectorVisible(false);
   };
 
@@ -387,16 +471,24 @@ export default function CreatePickupScreen() {
       setFormError('Please select a customer.');
       return;
     }
-    if (!pickupAddress.trim()) {
-      setFormError('Pickup address is required.');
+
+    const weightResult = parseEstimatedWeightInput(estimatedWeight);
+    if (!weightResult.success) {
+      setFormError(weightResult.error);
       return;
     }
-    if (!requestedDate.trim()) {
-      setFormError('Requested date is required.');
-      return;
-    }
-    if (!materialType.trim()) {
-      setFormError('Material type is required.');
+
+    const validation = validatePickupRequestInput({
+      customerId: selectedCustomer.id,
+      pickupAddress,
+      requestedDate,
+      requestedTime,
+      materialType,
+      estimatedWeight: weightResult.value,
+      notes,
+    });
+    if (!validation.success) {
+      setFormError(validation.error);
       return;
     }
 
@@ -405,24 +497,43 @@ export default function CreatePickupScreen() {
     setSubmitting(true);
 
     try {
-      const weightNum = estimatedWeight.trim() ? parseFloat(estimatedWeight.trim()) : undefined;
-      const result = await createPickupRequest({
-        customerId:      selectedCustomer.id,
-        pickupAddress:   pickupAddress.trim(),
-        requestedDate:   requestedDate.trim(),
-        requestedTime:   requestedTime.trim() || undefined,
-        materialType:    materialType.trim(),
-        estimatedWeight: weightNum && !isNaN(weightNum) ? weightNum : undefined,
-        notes:           notes.trim() || undefined,
-      });
+      const fingerprint = JSON.stringify(validation.value);
+      let pickupAttempt = pickupAttemptRef.current;
+      if (!pickupAttempt || pickupAttempt.fingerprint !== fingerprint) {
+        pickupAttempt = {
+          clientRequestId: createClientRequestId(),
+          fingerprint,
+          attempted: false,
+        };
+        pickupAttemptRef.current = pickupAttempt;
+      }
+
+      if (pickupAttempt.attempted) {
+        const confirmation = await findPickupByClientRequestId(
+          pickupAttempt.clientRequestId,
+        );
+        if (confirmation.success && confirmation.request) {
+          pickupAttemptRef.current = null;
+          showInfoMessage('Pickup request submitted successfully');
+          router.push('/(sales-rep)/(home)');
+          return;
+        }
+      }
+
+      pickupAttempt.attempted = true;
+      const result = await createPickupRequest(
+        validation.value,
+        pickupAttempt.clientRequestId,
+      );
 
       if (result.success) {
+        pickupAttemptRef.current = null;
         showInfoMessage('Pickup request submitted successfully');
-        router.push('/(sales-rep)');
+        router.push('/(sales-rep)/(home)');
       } else {
         const msg = result.error ?? 'Failed to submit pickup request.';
         setFormError(msg);
-        showErrorMessage(msg, 'Submission Error');
+        if (Platform.OS === 'ios') showErrorMessage(msg, 'Submission Error');
       }
     } finally {
       isSubmittingRef.current = false;
@@ -431,20 +542,36 @@ export default function CreatePickupScreen() {
   };
 
   // Still checking whether customers exist
-  if (hasAnyCustomers === null) {
+  if (customerAvailability === 'loading') {
     return (
       <ScreenScaffold mode="scroll" header={<AppHeader title="Create Pickup" subtitle="New pickup request" />}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textMuted }]}>
-            Loading customer directory…
-          </Text>
-        </View>
+        <LoadingState message="Loading customer directory…" />
       </ScreenScaffold>
     );
   }
 
-  if (!hasAnyCustomers) {
+  if (customerAvailability === 'error') {
+    return (
+      <ScreenScaffold mode="scroll" header={<AppHeader title="Create Pickup" subtitle="New pickup request" />}>
+        <EmptyState
+          title="Could not load customers"
+          message="Check your connection and try again."
+          action={
+            <Button
+              title="Retry"
+              variant="primary"
+              loading={checkingCustomers}
+              disabled={checkingCustomers}
+              onPress={() => void checkCustomers()}
+            />
+          }
+          variant="dashboard"
+        />
+      </ScreenScaffold>
+    );
+  }
+
+  if (customerAvailability === 'empty') {
     return (
       <ScreenScaffold mode="scroll" header={<AppHeader title="Create Pickup" subtitle="New pickup request" />}>
         <EmptyState
@@ -659,13 +786,16 @@ const styles = StyleSheet.create({
   },
   selectorTriggerLeft: {
     flex: 1,
+    minWidth: 0,
     gap: 2,
   },
   selectorTriggerName: {
+    flexShrink: 1,
     fontFamily: typography.fontFamily.bodySemibold,
     fontSize: typography.fontSize.sm,
   },
   selectorTriggerPhone: {
+    flexShrink: 1,
     fontFamily: typography.fontFamily.body,
     fontSize: typography.fontSize.xs,
   },
@@ -712,6 +842,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
   },
   selectorRow: {
     paddingHorizontal: spacing.md,
@@ -721,16 +853,20 @@ const styles = StyleSheet.create({
   },
   selectorRowContent: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
   selectorName: {
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     fontFamily: typography.fontFamily.bodySemibold,
     fontSize: typography.fontSize.sm,
   },
   selectorPhone: {
+    flexShrink: 1,
+    maxWidth: '45%',
     fontFamily: typography.fontFamily.body,
     fontSize: typography.fontSize.xs,
   },
@@ -740,6 +876,8 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   selectorAddress: {
+    flex: 1,
+    flexShrink: 1,
     fontFamily: typography.fontFamily.body,
     fontSize: typography.fontSize.xs,
   },
@@ -753,6 +891,18 @@ const styles = StyleSheet.create({
   selectorFooterLoader: {
     paddingVertical: spacing.md,
     alignItems: 'center',
+  },
+  selectorFooterError: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  selectorErrorText: {
+    fontFamily: typography.fontFamily.bodyMedium,
+    fontSize: typography.fontSize.sm,
+    lineHeight: typography.lineHeight.sm,
+    textAlign: 'center',
   },
 
   // ── Form chips ─────────────────────────────────────────────────────────────

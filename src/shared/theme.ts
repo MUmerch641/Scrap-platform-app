@@ -112,9 +112,9 @@ export const statusColors = {
     },
 
     warning: {
-      surface: '#422006',
-      text: '#FACC15',
-      border: '#713F12',
+      surface: 'rgba(230, 164, 107, 0.16)',
+      text: '#F4C08F',
+      border: 'rgba(230, 164, 107, 0.42)',
     },
 
     danger: {

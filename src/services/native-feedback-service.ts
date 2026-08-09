@@ -1,5 +1,7 @@
 import * as Haptics from 'expo-haptics';
-import { ActionSheetIOS, Alert, AlertButton, Platform, ToastAndroid } from 'react-native';
+import { ActionSheetIOS, Alert, Platform, ToastAndroid } from 'react-native';
+
+import { showAndroidErrorDialog } from '@/services/app-dialog-controller';
 
 export type NegativeHapticType = 'error' | 'warning';
 
@@ -47,12 +49,18 @@ export function showInfoMessage(message: string): void {
  */
 export function showErrorMessage(message: string, title = 'Error'): void {
   triggerNegativeHaptic('error');
-  Alert.alert(title, message, [{ text: 'OK' }]);
+  if (Platform.OS === 'ios') {
+    Alert.alert(title, message, [{ text: 'OK' }]);
+    return;
+  }
+  if (Platform.OS === 'android' && !showAndroidErrorDialog({ title, message })) {
+    // The provider is normally mounted before any screen action. This fallback still avoids Alert UI.
+    ToastAndroid.show(message, ToastAndroid.LONG);
+  }
 }
 
 /**
- * Displays a native platform confirmation dialog with Confirm and Cancel buttons.
- * Confirmation is native and does not trigger haptic feedback.
+ * Displays the existing native iOS confirmation. Android decisions use AppDialogProvider.
  */
 export function showNativeConfirmation(
   title: string,
@@ -61,6 +69,7 @@ export function showNativeConfirmation(
   confirmText = 'Confirm',
   cancelText = 'Cancel'
 ): void {
+  if (Platform.OS !== 'ios') return;
   Alert.alert(
     title,
     message,
@@ -82,7 +91,7 @@ export function showNativeConfirmation(
 }
 
 /**
- * Displays native iOS ActionSheet on iOS, falling back to Alert options on Android.
+ * Displays the existing native iOS ActionSheet. Android decisions use AppDialogProvider.
  * Does not trigger vibration on opening or selection.
  */
 export function showNativeActionSheet(
@@ -91,30 +100,17 @@ export function showNativeActionSheet(
   cancelButtonIndex: number,
   onSelect: (index: number) => void
 ): void {
-  if (Platform.OS === 'ios') {
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        title,
-        options,
-        cancelButtonIndex,
-      },
-      (buttonIndex) => {
-        if (buttonIndex !== cancelButtonIndex) {
-          onSelect(buttonIndex);
-        }
+  if (Platform.OS !== 'ios') return;
+  ActionSheetIOS.showActionSheetWithOptions(
+    {
+      title,
+      options,
+      cancelButtonIndex,
+    },
+    (buttonIndex) => {
+      if (buttonIndex !== cancelButtonIndex) {
+        onSelect(buttonIndex);
       }
-    );
-  } else {
-    const buttons: AlertButton[] = options.map((opt, idx) => ({
-      text: opt,
-      style: idx === cancelButtonIndex ? 'cancel' : 'default',
-      onPress: () => {
-        if (idx !== cancelButtonIndex) {
-          onSelect(idx);
-        }
-      },
-    }));
-
-    Alert.alert(title, undefined, buttons, { cancelable: true });
-  }
+    }
+  );
 }

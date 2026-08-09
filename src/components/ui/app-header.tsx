@@ -15,16 +15,25 @@ interface AppHeaderProps {
   title: string;
   subtitle?: string;
   onBack?: () => void;
+  backIconOnly?: boolean;
   rightAction?: React.ReactNode;
+  compact?: boolean;
 }
 
-export function AppHeader({ title, subtitle, onBack, rightAction }: AppHeaderProps) {
+export function AppHeader({
+  title,
+  subtitle,
+  onBack,
+  backIconOnly = false,
+  rightAction,
+  compact = false,
+}: AppHeaderProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const colors = semanticColors[isDark ? 'dark' : 'light'];
 
   const inner = (
-    <View style={styles.innerRow}>
+    <View style={[styles.innerRow, compact && styles.innerRowCompact]}>
       <View style={styles.leftContainer}>
         {onBack && (
           <Pressable
@@ -42,18 +51,38 @@ export function AppHeader({ title, subtitle, onBack, rightAction }: AppHeaderPro
                 : undefined
             }
           >
-            <Text style={[styles.backText, { color: brandColors.lightCopper }]}>
-              {Platform.OS === 'ios' ? '‹ Back' : '← Back'}
+            <Text
+              style={[
+                styles.backText,
+                backIconOnly && styles.backIconOnlyText,
+                backIconOnly && Platform.OS === 'android' && styles.backIconOnlyTextAndroid,
+                { color: brandColors.lightCopper },
+              ]}
+            >
+              {Platform.OS === 'ios'
+                ? (backIconOnly ? '‹' : '‹ Back')
+                : (backIconOnly ? '←' : '← Back')}
             </Text>
           </Pressable>
         )}
         <View style={styles.titleBlock}>
-          <Text style={[styles.title, { color: brandColors.white }]} numberOfLines={1}>
+          <Text
+            style={[
+              styles.title,
+              compact && styles.titleCompact,
+              { color: brandColors.white },
+            ]}
+            numberOfLines={1}
+          >
             {title}
           </Text>
           {subtitle && (
             <Text
-              style={[styles.subtitle, { color: brandColors.offWhite }]}
+              style={[
+                styles.subtitle,
+                compact && styles.subtitleCompact,
+                { color: brandColors.offWhite },
+              ]}
               numberOfLines={1}
             >
               {subtitle}
@@ -77,6 +106,7 @@ export function AppHeader({ title, subtitle, onBack, rightAction }: AppHeaderPro
           tintColor={brandColors.navy}
           style={[
             styles.container,
+            compact && styles.containerCompact,
             {
               borderBottomColor: brandColors.lightCopper,
             },
@@ -92,6 +122,7 @@ export function AppHeader({ title, subtitle, onBack, rightAction }: AppHeaderPro
       <View
         style={[
           styles.container,
+          compact && styles.containerCompact,
           {
             backgroundColor: brandColors.navy,
             borderBottomColor: brandColors.lightCopper,
@@ -108,6 +139,7 @@ export function AppHeader({ title, subtitle, onBack, rightAction }: AppHeaderPro
     <View
       style={[
         styles.container,
+        compact && styles.containerCompact,
         {
           backgroundColor: brandColors.navy,
           borderBottomColor: brandColors.lightCopper,
@@ -126,6 +158,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
   },
+  containerCompact: {
+    minHeight: 48,
+  },
   innerRow: {
     flex: 1,
     flexDirection: 'row',
@@ -134,6 +169,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
     minHeight: 56,
+  },
+  innerRowCompact: {
+    minHeight: 48,
+    paddingVertical: 2,
   },
   leftContainer: {
     flexDirection: 'row',
@@ -145,21 +184,39 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   backButton: {
+    minWidth: 44,
     paddingRight: spacing.xs,
     minHeight: 44,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   backText: {
     fontFamily: typography.fontFamily.bodySemibold,
     fontSize: typography.fontSize.md,
   },
+  backIconOnlyText: {
+    fontSize: 36,
+    lineHeight: 38,
+  },
+  backIconOnlyTextAndroid: {
+    fontSize: 32,
+    lineHeight: 36,
+  },
   title: {
     fontFamily: typography.fontFamily.headingSemibold,
     fontSize: typography.fontSize.md,
   },
+  titleCompact: {
+    fontSize: typography.fontSize.md,
+    lineHeight: typography.lineHeight.sm,
+  },
   subtitle: {
     fontFamily: typography.fontFamily.body,
     fontSize: typography.fontSize.xs,
+  },
+  subtitleCompact: {
+    fontSize: 11,
+    lineHeight: 14,
   },
   rightContainer: {
     flexDirection: 'row',

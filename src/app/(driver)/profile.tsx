@@ -2,7 +2,8 @@ import React from 'react';
 import { Platform, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { useUserRole } from '@/app/context/UserRoleContext';
+import { useUserRole } from '@/context/UserRoleContext';
+import { useAppDialog } from '@/context/AppDialogContext';
 import { AppHeader } from '@/components/ui/app-header';
 import { Button } from '@/components/ui/button';
 import { ScreenScaffold } from '@/components/ui/screen-scaffold';
@@ -10,13 +11,13 @@ import {
   showInfoMessage,
   showErrorMessage,
   showNativeActionSheet,
-  showNativeConfirmation,
 } from '@/services/native-feedback-service';
 import { semanticColors, spacing, typography } from '@/shared/theme';
 
 export default function DriverProfileScreen() {
   const router = useRouter();
   const { userProfile, signOut } = useUserRole();
+  const { showDialog } = useAppDialog();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const colors = semanticColors[isDark ? 'dark' : 'light'];
@@ -37,13 +38,16 @@ export default function DriverProfileScreen() {
         () => void doSignOut()
       );
     } else {
-      showNativeConfirmation(
-        'Sign Out',
-        'Are you sure you want to sign out?',
-        () => void doSignOut(),
-        'Sign Out',
-        'Cancel'
-      );
+      showDialog({
+        title: 'Sign out',
+        message: 'Are you sure you want to sign out?',
+        confirmLabel: 'Sign Out',
+        cancelLabel: 'Cancel',
+        destructive: true,
+        icon: 'log-out-outline',
+        dismissible: false,
+        onConfirm: doSignOut,
+      });
     }
   };
 

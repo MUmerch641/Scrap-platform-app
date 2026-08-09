@@ -10,7 +10,7 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 
-import { useUserRole } from '@/app/context/UserRoleContext'
+import { useUserRole } from '@/context/UserRoleContext'
 import { BrandHeader } from '@/components/ui/brand-header'
 import { FormInput } from '@/components/ui/form-input'
 import { PrimaryButton } from '@/components/ui/primary-button'

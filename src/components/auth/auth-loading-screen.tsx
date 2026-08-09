@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import {
   AccessibilityInfo,
-  ActivityIndicator,
   StyleSheet,
   Text,
   View,
@@ -9,10 +8,12 @@ import {
 import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import Reanimated, {
+  cancelAnimation,
   Easing,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
+  withRepeat,
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
@@ -29,42 +30,38 @@ import { brandColors, typography } from '@/shared/theme';
  *     the application's loaded Google Fonts (`LeagueSpartan_700Bold` & `Quicksand_600SemiBold`).
  *
  * Sequence:
- *   Phase 1 (0–400ms): Transparent recycling symbol scales smoothly (0.88 → 1.03 → 1.0).
+ *   Phase 1 (0–400ms): The recycling symbol gently settles (1.0 → 1.03 → 1.0).
  *   Phase 2 (200–420ms): Brand lockup text fades in (opacity 0 → 1) and slides up (translateY 10 → 0),
  *                        overlapping the end of the symbol settle.
  *
  * Loader:
- *   - ActivityIndicator is hidden on fast launches.
- *   - Only displayed if session restoration takes longer than 700ms.
+ *   - If session restoration takes longer than 650ms, the main symbol rotates.
+ *   - No separate generic or duplicate loading indicator is shown.
  *
  * Reduce Motion:
  *   - Immediately renders static brand lockup at full opacity with no scale/translation.
  */
 
-const SPINNER_DELAY_MS = 700;
-
 export function AuthLoadingScreen() {
-  const symbolScale = useSharedValue(0.88);
+  const symbolScale = useSharedValue(1);
+  const symbolRotation = useSharedValue(0);
   const wordmarkOpacity = useSharedValue(0);
   const wordmarkTranslateY = useSharedValue(10);
-  const [showSpinner, setShowSpinner] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
-    const spinnerTimer = setTimeout(() => {
-      if (isMounted) setShowSpinner(true);
-    }, SPINNER_DELAY_MS);
 
     void AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
       if (!isMounted) return;
       if (reduceMotion) {
         symbolScale.value = 1;
+        symbolRotation.value = 0;
         wordmarkOpacity.value = 1;
         wordmarkTranslateY.value = 0;
         return;
       }
 
-      // Phase 1: Symbol scale (0.88 -> 1.03 -> 1.0) ~400ms total
+      // Phase 1: Symbol scale (1.0 -> 1.03 -> 1.0) ~400ms total
       symbolScale.value = withSequence(
         withTiming(1.03, {
           duration: 280,
@@ -74,6 +71,19 @@ export function AuthLoadingScreen() {
           duration: 120,
           easing: Easing.inOut(Easing.quad),
         })
+      );
+
+      // If startup takes longer, the main brand mark becomes the loader itself.
+      symbolRotation.value = withDelay(
+        650,
+        withRepeat(
+          withTiming(360, {
+            duration: 1800,
+            easing: Easing.linear,
+          }),
+          -1,
+          false,
+        ),
       );
 
       // Phase 2: Wordmark fade-in + slide-up (starts at 200ms, duration 220ms)
@@ -95,12 +105,18 @@ export function AuthLoadingScreen() {
 
     return () => {
       isMounted = false;
-      clearTimeout(spinnerTimer);
+      cancelAnimation(symbolScale);
+      cancelAnimation(symbolRotation);
+      cancelAnimation(wordmarkOpacity);
+      cancelAnimation(wordmarkTranslateY);
     };
-  }, [symbolScale, wordmarkOpacity, wordmarkTranslateY]);
+  }, [symbolRotation, symbolScale, wordmarkOpacity, wordmarkTranslateY]);
 
   const symbolStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: symbolScale.value }],
+    transform: [
+      { scale: symbolScale.value },
+      { rotate: `${symbolRotation.value}deg` },
+    ],
   }));
 
   const wordmarkStyle = useAnimatedStyle(() => ({
@@ -109,7 +125,12 @@ export function AuthLoadingScreen() {
   }));
 
   return (
-    <View style={styles.container} accessibilityLabel="Checking account access">
+    <View
+      style={styles.container}
+      accessibilityRole="progressbar"
+      accessibilityLabel="Checking account access"
+      accessibilityLiveRegion="polite"
+    >
       <StatusBar style="light" />
       <View style={styles.content}>
         {/* Transparent recycling symbol mark */}
@@ -127,15 +148,6 @@ export function AuthLoadingScreen() {
           <Text style={styles.brandTitle}>PROCOPPER</Text>
           <Text style={styles.brandSubtitle}>RECYCLING</Text>
         </Reanimated.View>
-
-        {/* Delayed loader */}
-        {showSpinner ? (
-          <ActivityIndicator
-            color={brandColors.lightCopper}
-            size="small"
-            style={styles.spinner}
-          />
-        ) : null}
       </View>
     </View>
   );
@@ -148,18 +160,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: brandColors.navy,
   },
-  // Optical center — slightly above mathematical center
   content: {
     alignItems: 'center',
-    marginTop: -30,
   },
   mark: {
-    width: 140,
-    height: 140,
+    width: 220,
+    height: 220,
   },
   wordmarkContainer: {
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: -48,
   },
   brandTitle: {
     fontFamily: typography.fontFamily.heading,
@@ -173,8 +183,5 @@ const styles = StyleSheet.create({
     letterSpacing: 5,
     color: brandColors.lightCopper,
     marginTop: 2,
-  },
-  spinner: {
-    marginTop: 28,
   },
 });

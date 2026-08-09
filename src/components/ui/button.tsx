@@ -1,5 +1,4 @@
 import {
-    ActivityIndicator,
     Platform,
     Pressable,
     StyleSheet,
@@ -13,6 +12,7 @@ import Animated, {
     withSpring,
 } from 'react-native-reanimated';
 
+import { BrandSpinner, BUTTON_LOADER_SIZE } from '@/components/ui/loading-state';
 import { radius, semanticColors, spacing, typography } from '@/shared/theme';
 
 interface ButtonProps {
@@ -99,7 +99,10 @@ export function Button({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={getTextColor()} size="small" />
+        <BrandSpinner
+          size={BUTTON_LOADER_SIZE}
+          accessibilityLabel={`${title} in progress`}
+        />
       ) : (
         <Text style={[styles.text, { color: getTextColor() }]}>{title}</Text>
       )}

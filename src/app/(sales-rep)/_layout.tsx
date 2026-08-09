@@ -1,4 +1,4 @@
-import { useUserRole } from '@/app/context/UserRoleContext';
+import { useUserRole } from '@/context/UserRoleContext';
 import { AuthLoadingScreen } from '@/components/auth/auth-loading-screen';
 import { ROLES } from '@/shared/roles';
 import { semanticColors, typography } from '@/shared/theme';
@@ -24,7 +24,10 @@ export default function SalesRepLayout() {
       // On iOS the native UITabBarController adapts to system appearance automatically;
       // remounting here would destroy tab state and flash the screen.
       key={Platform.OS === 'android' ? (colorScheme ?? 'light') : undefined}
-      backgroundColor={Platform.OS === 'ios' ? undefined : colors.tabBarBackground}
+      // Match the Android tab surface to the screen so the native bar does not
+      // create a dark horizontal seam at the content boundary. iOS keeps its
+      // system-managed tab material and shadow.
+      backgroundColor={Platform.OS === 'ios' ? undefined : colors.background}
       tintColor={colors.tabBarSelected}
       iconColor={{
         default: colors.tabBarDefault,
@@ -42,7 +45,7 @@ export default function SalesRepLayout() {
       labelVisibilityMode={Platform.OS === 'android' ? 'selected' : undefined}
       rippleColor={Platform.OS === 'android' ? colors.tabBarRipple : undefined}
     >
-      <NativeTabs.Trigger name="index">
+      <NativeTabs.Trigger name="(home)">
         <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="house" md="home" />
       </NativeTabs.Trigger>

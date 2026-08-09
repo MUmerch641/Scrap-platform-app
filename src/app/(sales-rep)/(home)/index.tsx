@@ -1,7 +1,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
+    Pressable,
     StyleSheet,
     Text,
     useColorScheme,
@@ -16,19 +16,18 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated';
 
-import { useUserRole } from '@/app/context/UserRoleContext';
+import { useUserRole } from '@/context/UserRoleContext';
+import { PickupListCard } from '@/components/pickups/pickup-list-card';
 import { AppHeader } from '@/components/ui/app-header';
-import { AppIcon } from '@/components/ui/app-icon';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { LoadingState } from '@/components/ui/loading-state';
 import { ScreenScaffold } from '@/components/ui/screen-scaffold';
-import { StatusBadge, StatusVariant } from '@/components/ui/status-badge';
 import {
-    fetchPickupRequests,
+    fetchPickupDashboard,
     PickupMetrics,
     PickupRequest,
-    PickupRequestStatus,
 } from '@/services/pickup-service';
 import { semanticColors, spacing, typography } from '@/shared/theme';
 
@@ -118,17 +117,6 @@ function MetricCard({ label, count, delay }: MetricCardProps) {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-function getStatusBadgeVariant(status: PickupRequestStatus): { label: string; variant: StatusVariant } {
-  switch (status) {
-    case 'pending_review': return { label: 'Pending',   variant: 'warning' };
-    case 'approved':       return { label: 'Approved',  variant: 'success' };
-    case 'scheduled':      return { label: 'Scheduled', variant: 'neutral' };
-    case 'completed':      return { label: 'Completed', variant: 'success' };
-    case 'rejected':       return { label: 'Rejected',  variant: 'danger'  };
-    default:               return { label: status,      variant: 'neutral' };
-  }
-}
-
 export default function SalesRepHomeScreen() {
   const router      = useRouter();
   const { userProfile } = useUserRole();
@@ -138,26 +126,56 @@ export default function SalesRepHomeScreen() {
 
   const [requests, setRequests] = useState<PickupRequest[]>([]);
   const [metrics,  setMetrics]  = useState<PickupMetrics>(DEFAULT_METRICS);
-  const [loading,  setLoading]  = useState(true);
+  const [loadingRecent, setLoadingRecent] = useState(true);
+  const [recentError, setRecentError] = useState<string | null>(null);
+  const [metricsError, setMetricsError] = useState<string | null>(null);
+  const requestSequenceRef = useRef(0);
+  const hasRecentRef = useRef(false);
 
   const loadData = useCallback(async () => {
-    setLoading(true);
-    const result = await fetchPickupRequests();
-    setLoading(false);
-    if (result.success) {
+    const requestSequence = ++requestSequenceRef.current;
+    setLoadingRecent(!hasRecentRef.current);
+    setRecentError(null);
+    setMetricsError(null);
+    const result = await fetchPickupDashboard();
+    if (requestSequence !== requestSequenceRef.current) return;
+
+    setLoadingRecent(false);
+    if (result.requestsSuccess) {
       setRequests(result.requests);
+      hasRecentRef.current = result.requests.length > 0;
+    } else {
+      setRecentError(result.requestsError ?? 'Unable to load recent pickups.');
+    }
+    if (result.metricsSuccess) {
       setMetrics(result.metrics);
+    } else {
+      setMetricsError(result.metricsError ?? 'Unable to load pickup counts.');
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       void loadData();
+      return () => {
+        requestSequenceRef.current += 1;
+      };
     }, [loadData])
   );
 
   const handleCreatePickup = () => {
     router.push('/(sales-rep)/create-job');
+  };
+
+  const handleViewAllPickups = () => {
+    router.push('/(sales-rep)/(home)/pickups');
+  };
+
+  const handlePickupPress = (pickup: PickupRequest) => {
+    router.push({
+      pathname: '/(sales-rep)/(home)/pickup/[id]',
+      params: { id: pickup.id },
+    });
   };
 
   const fullName      = userProfile?.fullName?.trim();
@@ -211,20 +229,40 @@ export default function SalesRepHomeScreen() {
             <MetricCard label="Completed" count={metrics.completed} delay={S_CARD_1 * STAGGER_MS} />
           </View>
         </View>
+        {metricsError ? (
+          <Button title="Retry counts" variant="outline" onPress={() => void loadData()} />
+        ) : null}
 
         {/* ── Section header: Recent Pickups ─────────────────────────────── */}
         <FadeSlide delay={S_SEC_RECENT * STAGGER_MS}>
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Pickups</Text>
+            <Pressable
+              onPress={handleViewAllPickups}
+              accessibilityRole="button"
+              accessibilityLabel="View all pickup requests"
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.viewAllButton,
+                { opacity: pressed ? 0.55 : 1 },
+              ]}
+            >
+              <Text style={[styles.viewAllText, { color: colors.primary }]}>View All</Text>
+            </Pressable>
           </View>
         </FadeSlide>
 
         {/* ── Recent pickups content ─────────────────────────────────────── */}
         <FadeSlide delay={S_RECENT_CARD * STAGGER_MS}>
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={colors.primary} />
-            </View>
+          {loadingRecent ? (
+            <LoadingState message="Loading recent pickups…" />
+          ) : recentError && requests.length === 0 ? (
+            <EmptyState
+              title="Could not load recent pickups"
+              message={recentError}
+              action={<Button title="Retry" variant="outline" onPress={() => void loadData()} />}
+              variant="inline"
+            />
           ) : requests.length === 0 ? (
             <Card style={styles.recentPickupsCard}>
               <EmptyState
@@ -235,33 +273,16 @@ export default function SalesRepHomeScreen() {
             </Card>
           ) : (
             <View style={styles.requestList}>
-              {requests.slice(0, 5).map((req) => {
-                const badge = getStatusBadgeVariant(req.status);
-                return (
-                  <Card key={req.id} style={styles.requestCard}>
-                    <View style={styles.reqHeaderRow}>
-                      <Text style={[styles.reqCustomerName, { color: colors.text }]}>
-                        {req.customerName || 'Customer Request'}
-                      </Text>
-                      <StatusBadge label={badge.label} variant={badge.variant} />
-                    </View>
-                    <View style={styles.reqDetailRow}>
-                      <Text style={[styles.reqMeta, { color: colors.textMuted }]}>
-                        Material: <Text style={{ color: colors.text }}>{req.materialType}</Text>
-                      </Text>
-                      <Text style={[styles.reqMeta, { color: colors.textMuted }]}>
-                        Date: <Text style={{ color: colors.text }}>{req.requestedDate}</Text>
-                      </Text>
-                    </View>
-                    <View style={styles.reqAddressRow}>
-                      <AppIcon name="location-outline" size={12} />
-                      <Text style={[styles.reqAddress, { color: colors.textMuted }]} numberOfLines={1}>
-                        {req.pickupAddress}
-                      </Text>
-                    </View>
-                  </Card>
-                );
-              })}
+              {recentError ? (
+                <Button title="Retry recent pickups" variant="outline" onPress={() => void loadData()} />
+              ) : null}
+              {requests.map((request) => (
+                <PickupListCard
+                  key={request.id}
+                  pickup={request}
+                  onPress={handlePickupPress}
+                />
+              ))}
             </View>
           )}
         </FadeSlide>
@@ -292,12 +313,26 @@ const styles = StyleSheet.create({
     marginVertical: spacing.xs / 2,
   },
   sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
     marginTop: spacing.xs,
     marginBottom: -(spacing.xs / 2),
   },
   sectionTitle: {
     fontFamily: typography.fontFamily.headingSemibold,
     fontSize: typography.fontSize.md,
+  },
+  viewAllButton: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xs,
+    marginVertical: -spacing.sm,
+  },
+  viewAllText: {
+    fontFamily: typography.fontFamily.bodySemibold,
+    fontSize: typography.fontSize.sm,
   },
   metricsGrid: {
     gap: spacing.sm,
@@ -334,13 +369,16 @@ const styles = StyleSheet.create({
   },
   reqHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    gap: spacing.xs,
   },
   reqCustomerName: {
     fontFamily: typography.fontFamily.headingSemibold,
     fontSize: typography.fontSize.md,
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     paddingRight: spacing.xs,
   },
   reqDetailRow: {

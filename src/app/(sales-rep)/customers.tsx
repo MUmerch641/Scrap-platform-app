@@ -1,7 +1,6 @@
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
     FlatList,
     KeyboardAvoidingView,
     ListRenderItemInfo,
@@ -28,18 +27,30 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FormInput } from '@/components/ui/form-input';
+import {
+  BrandSpinner,
+  CONTENT_LOADER_SIZE,
+  LoadingState,
+} from '@/components/ui/loading-state';
 import { ScreenScaffold } from '@/components/ui/screen-scaffold';
 import { SearchField } from '@/components/ui/search-field';
 import {
     createCustomer,
     Customer,
     fetchCustomersPage,
+    findCustomerByClientRequestId,
+    findCustomerByPhone,
+    updateCustomer,
+    validateCustomerInput,
 } from '@/services/customer-service';
+import { createClientRequestId } from '@/shared/client-request-id';
+import { useAppDialog } from '@/context/AppDialogContext';
 import {
     showErrorMessage,
     showInfoMessage,
+    showNativeConfirmation,
 } from '@/services/native-feedback-service';
-import { radius, semanticColors, spacing, typography } from '@/shared/theme';
+import { brandColors, radius, semanticColors, spacing, typography } from '@/shared/theme';
 
 // ── Pagination config ─────────────────────────────────────────────────────────
 const PAGE_SIZE = 30;
@@ -49,7 +60,7 @@ const SEARCH_DEBOUNCE_MS = 350;
 // ── Customer row — stable render item for FlatList ───────────────────────────
 interface CustomerRowProps {
   customer: Customer;
-  index: number;
+  onEdit: (customer: Customer) => void;
 }
 
 function useColors() {
@@ -58,55 +69,59 @@ function useColors() {
   return semanticColors[isDark ? 'dark' : 'light'];
 }
 
-const ROW_STAGGER    = 40;
-const ROW_DURATION   = 300;
-const ROW_EASE       = Easing.out(Easing.cubic);
-// Only animate the first 10 rows — beyond that skip delay to avoid long waits
-const MAX_ANIM_INDEX = 10;
-
-function CustomerRow({ customer, index }: CustomerRowProps) {
-  const colors     = useColors();
-  const opacity    = useSharedValue(0);
-  const translateY = useSharedValue(8);
-
-  React.useEffect(() => {
-    const delay = Math.min(index, MAX_ANIM_INDEX) * ROW_STAGGER;
-    const timer = setTimeout(() => {
-      opacity.value    = withTiming(1, { duration: ROW_DURATION, easing: ROW_EASE });
-      translateY.value = withTiming(0, { duration: ROW_DURATION, easing: ROW_EASE });
-    }, delay);
-    return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const animStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }],
-  }));
-
+const CustomerRow = React.memo(function CustomerRow({ customer, onEdit }: CustomerRowProps) {
+  const colors = useColors();
   return (
-    <Animated.View style={animStyle}>
+    <Pressable
+      onPress={() => onEdit(customer)}
+      accessibilityRole="button"
+      accessibilityLabel={`Edit ${customer.name}, phone ${customer.phone}, address ${customer.address}`}
+      accessibilityHint="Opens the customer edit form"
+      style={({ pressed }) => [
+        styles.customerTilePressable,
+        pressed && styles.customerTilePressed,
+      ]}
+    >
       <Card style={styles.compactCustomerCard}>
         <View style={styles.cardHeaderRow}>
-          <Text style={[styles.customerName, { color: colors.text }]} numberOfLines={1}>
+          <Text
+            style={[styles.customerName, { color: colors.text }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
             {customer.name}
           </Text>
-          <Text style={[styles.customerPhone, { color: colors.primary }]} numberOfLines={1}>
-            {customer.phone}
-          </Text>
+          <View style={styles.cardHeaderMeta}>
+            <Text
+              style={[styles.customerPhone, { color: colors.primary }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {customer.phone}
+            </Text>
+            <AppIcon name="create-outline" size={14} color={colors.textMuted} />
+          </View>
         </View>
 
         <View style={styles.iconRow}>
-          <AppIcon name="location-outline" size={13} />
-          <Text style={[styles.customerAddress, { color: colors.textMuted }]} numberOfLines={1}>
+          <AppIcon name="location-outline" size={12} />
+          <Text
+            style={[styles.customerAddress, { color: colors.textMuted }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
             {customer.address}
           </Text>
         </View>
 
         {customer.email ? (
           <View style={styles.iconRow}>
-            <AppIcon name="mail-outline" size={13} />
-            <Text style={[styles.customerEmail, { color: colors.textMuted }]} numberOfLines={1}>
+            <AppIcon name="mail-outline" size={12} />
+            <Text
+              style={[styles.customerEmail, { color: colors.textMuted }]}
+              numberOfLines={1}
+              ellipsizeMode="middle"
+            >
               {customer.email}
             </Text>
           </View>
@@ -114,20 +129,20 @@ function CustomerRow({ customer, index }: CustomerRowProps) {
 
         {customer.notes ? (
           <View style={styles.iconRow}>
-            <AppIcon name="document-text-outline" size={13} />
-            <Text style={[styles.customerNotes, { color: colors.textMuted }]} numberOfLines={1}>
+            <AppIcon name="document-text-outline" size={12} />
+            <Text
+              style={[styles.customerNotes, { color: colors.textMuted }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               {customer.notes}
             </Text>
           </View>
         ) : null}
       </Card>
-    </Animated.View>
+    </Pressable>
   );
-}
-
-function renderCustomerRow({ item, index }: ListRenderItemInfo<Customer>) {
-  return <CustomerRow customer={item} index={index} />;
-}
+});
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Modal form fields with staggered entrance ────────────────────────────────
@@ -164,20 +179,31 @@ function FormFieldAnimated({ delay, children }: FormFieldAnimatedProps) {
 
 export default function CustomersScreen() {
   const colors = useColors();
+  const { showDialog } = useAppDialog();
 
   // ── List state ─────────────────────────────────────────────────────────────
   const [customers, setCustomers]   = useState<Customer[]>([]);
   const [search, setSearch]         = useState('');
   const [loading, setLoading]       = useState(true);
+  const [searching, setSearching]   = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore]       = useState(false);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
+  const [loadError, setLoadError]   = useState<string | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const currentPageRef              = useRef(0);
   const activeSearchRef             = useRef('');
   const searchDebounceRef           = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestSequenceRef          = useRef(0);
+  const isLoadingMoreRef            = useRef(false);
+  const hasLoadedRef                = useRef(false);
+  const hasRecordsRef               = useRef(false);
   // ──────────────────────────────────────────────────────────────────────────
 
   // ── Add customer modal state ───────────────────────────────────────────────
   const [showFormModal, setShowFormModal] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [name,     setName]     = useState('');
   const [phone,    setPhone]    = useState('');
   const [email,    setEmail]    = useState('');
@@ -186,63 +212,204 @@ export default function CustomersScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError]   = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
+  const createAttemptRef = useRef<{
+    clientRequestId: string;
+    fingerprint: string;
+    attempted: boolean;
+  } | null>(null);
   // ──────────────────────────────────────────────────────────────────────────
 
   // ── Data fetching ──────────────────────────────────────────────────────────
-  const loadPage = useCallback(async (searchTerm: string, page: number, append: boolean) => {
-    if (page === 0 && !append) setLoading(true);
-    else setLoadingMore(true);
+  const loadPage = useCallback(async (
+    searchTerm: string,
+    page: number,
+    append: boolean,
+    isRefresh = false,
+  ) => {
+    const requestSequence = ++requestSequenceRef.current;
+    if (isRefresh) setRefreshing(true);
+    else if (page === 0 && !append) {
+      if (hasLoadedRef.current) setSearching(true);
+      else setLoading(true);
+    }
+    else {
+      isLoadingMoreRef.current = true;
+      setLoadingMore(true);
+    }
 
-    const result = await fetchCustomersPage(searchTerm, page, PAGE_SIZE);
+    if (append) setLoadMoreError(null);
+    else setLoadError(null);
+
+    const result = await fetchCustomersPage(
+      searchTerm,
+      page,
+      PAGE_SIZE,
+      page === 0,
+    );
+
+    if (requestSequence !== requestSequenceRef.current) return;
 
     setLoading(false);
+    setSearching(false);
+    setRefreshing(false);
     setLoadingMore(false);
+    isLoadingMoreRef.current = false;
+    hasLoadedRef.current = true;
 
     if (!result.success) {
-      if (!append) showErrorMessage(result.error ?? 'Failed to load customers.', 'Customer Error');
+      const message = result.error ?? 'Failed to load customers.';
+      if (append) setLoadMoreError(message);
+      else if (!hasRecordsRef.current) {
+        setCustomers([]);
+        setHasMore(false);
+        setTotalCount(null);
+        setLoadError(message);
+      } else {
+        setLoadError(message);
+      }
       return;
     }
 
     setHasMore(result.hasMore);
+    if (page === 0) setTotalCount(result.totalCount ?? result.customers.length);
     currentPageRef.current = page;
-    setCustomers(prev => append ? [...prev, ...result.customers] : result.customers);
+    setCustomers((previous) => {
+      if (!append) {
+        hasRecordsRef.current = result.customers.length > 0;
+        return result.customers;
+      }
+      const existingIds = new Set(previous.map((customer) => customer.id));
+      const nextCustomers = [
+        ...previous,
+        ...result.customers.filter((customer) => !existingIds.has(customer.id)),
+      ];
+      hasRecordsRef.current = nextCustomers.length > 0;
+      return nextCustomers;
+    });
   }, []);
 
   const reload = useCallback((term: string) => {
     activeSearchRef.current = term;
+    setTotalCount(null);
     void loadPage(term, 0, false);
   }, [loadPage]);
 
   useFocusEffect(
     useCallback(() => {
       reload(activeSearchRef.current);
+      return () => {
+        requestSequenceRef.current += 1;
+        isLoadingMoreRef.current = false;
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+      };
     }, [reload])
   );
 
   const handleSearchChange = (text: string) => {
     setSearch(text);
+    setSearching(true);
+    setTotalCount(null);
+    requestSequenceRef.current += 1;
+    isLoadingMoreRef.current = false;
+    setLoadingMore(false);
+    setRefreshing(false);
+    setLoadMoreError(null);
+    setLoadError(null);
+    hasRecordsRef.current = false;
+    setCustomers([]);
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     searchDebounceRef.current = setTimeout(() => {
-      reload(text);
+      reload(text.trim());
     }, SEARCH_DEBOUNCE_MS);
   };
 
   const handleLoadMore = () => {
-    if (loadingMore || !hasMore) return;
+    if (isLoadingMoreRef.current || loadingMore || !hasMore) return;
     void loadPage(activeSearchRef.current, currentPageRef.current + 1, true);
   };
+
+  const handleRefresh = () => {
+    requestSequenceRef.current += 1;
+    isLoadingMoreRef.current = false;
+    setLoadingMore(false);
+    void loadPage(activeSearchRef.current, 0, false, true);
+  };
+
+  React.useEffect(() => () => {
+    requestSequenceRef.current += 1;
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+  }, []);
   // ──────────────────────────────────────────────────────────────────────────
 
   // ── Add customer ───────────────────────────────────────────────────────────
   const resetForm = () => {
     setName(''); setPhone(''); setEmail('');
     setAddress(''); setNotes(''); setFormError(null);
+    createAttemptRef.current = null;
   };
 
-  const handleCreateCustomer = async () => {
+  const closeFormModal = () => {
+    setShowFormModal(false);
+    setEditingCustomer(null);
+    resetForm();
+  };
+
+  const openAddCustomer = () => {
+    setEditingCustomer(null);
+    resetForm();
+    setShowFormModal(true);
+  };
+
+  const handleEditCustomer = useCallback((customer: Customer) => {
+    setEditingCustomer(customer);
+    setName(customer.name);
+    setPhone(customer.phone);
+    setEmail(customer.email ?? '');
+    setAddress(customer.address);
+    setNotes(customer.notes ?? '');
+    setFormError(null);
+    setShowFormModal(true);
+  }, []);
+
+  const isFormDirty = editingCustomer
+    ? name !== editingCustomer.name
+      || phone !== editingCustomer.phone
+      || email !== (editingCustomer.email ?? '')
+      || address !== editingCustomer.address
+      || notes !== (editingCustomer.notes ?? '')
+    : Boolean(name || phone || email || address || notes);
+
+  const requestCloseForm = () => {
+    if (submitting) return;
+    if (!isFormDirty) {
+      closeFormModal();
+      return;
+    }
+
+    const message = editingCustomer
+      ? 'Your customer edits have not been saved.'
+      : 'The new customer has not been saved.';
+    if (Platform.OS === 'ios') {
+      showNativeConfirmation('Discard changes?', message, closeFormModal, 'Discard');
+    } else {
+      showDialog({
+        title: 'Discard changes?',
+        message,
+        confirmLabel: 'Discard',
+        cancelLabel: 'Cancel',
+        destructive: true,
+        icon: 'alert-circle-outline',
+        dismissible: false,
+        onConfirm: closeFormModal,
+      });
+    }
+  };
+
+  const handleSaveCustomer = async (allowDuplicatePhone = false) => {
     if (isSubmittingRef.current || submitting) return;
-    if (!name.trim() || !phone.trim() || !address.trim()) {
-      setFormError('Name, Phone, and Address are required.');
+    const validation = validateCustomerInput({ name, phone, email, address, notes });
+    if (!validation.success) {
+      setFormError(validation.error);
       return;
     }
 
@@ -251,16 +418,82 @@ export default function CustomersScreen() {
     setSubmitting(true);
 
     try {
-      const result = await createCustomer({ name, phone, email, address, notes });
+      let createAttempt = createAttemptRef.current;
+      if (!editingCustomer) {
+        const fingerprint = JSON.stringify(validation.value);
+        if (!createAttempt || createAttempt.fingerprint !== fingerprint) {
+          createAttempt = {
+            clientRequestId: createClientRequestId(),
+            fingerprint,
+            attempted: false,
+          };
+          createAttemptRef.current = createAttempt;
+        }
+
+        if (createAttempt.attempted) {
+          const confirmation = await findCustomerByClientRequestId(
+            createAttempt.clientRequestId,
+          );
+          if (confirmation.success && confirmation.customer) {
+            showInfoMessage('Customer created successfully');
+            closeFormModal();
+            reload(activeSearchRef.current);
+            return;
+          }
+        }
+      }
+
+      if (!allowDuplicatePhone) {
+        const duplicateResult = await findCustomerByPhone(
+          validation.value.phone,
+          editingCustomer?.id,
+        );
+        if (duplicateResult.success && duplicateResult.customer) {
+          const existingCustomer = duplicateResult.customer;
+          const duplicateMessage =
+            `${existingCustomer.name} already uses this phone number. ` +
+            `Customer names may repeat. ${editingCustomer ? 'Save these changes' : 'Create this customer'} anyway?`;
+          const confirmLabel = editingCustomer ? 'Save Anyway' : 'Create Anyway';
+          if (Platform.OS === 'ios') {
+            showNativeConfirmation(
+              'Possible duplicate phone',
+              `${existingCustomer.name} already uses ${existingCustomer.phone}. ` +
+                `Customer names may repeat. ${editingCustomer ? 'Save these changes' : 'Create this customer'} anyway?`,
+              () => { void handleSaveCustomer(true); },
+              confirmLabel,
+            );
+          } else {
+            showDialog({
+              title: 'Customer already exists',
+              message: duplicateMessage,
+              confirmLabel,
+              cancelLabel: 'Cancel',
+              icon: 'alert-circle-outline',
+              dismissible: false,
+              onConfirm: () => handleSaveCustomer(true),
+            });
+          }
+          return;
+        }
+      }
+
+      if (createAttempt) createAttempt.attempted = true;
+      const result = editingCustomer
+        ? await updateCustomer(editingCustomer.id, validation.value)
+        : await createCustomer(validation.value, createAttempt!.clientRequestId);
       if (result.success) {
-        showInfoMessage('Customer created successfully');
-        resetForm();
-        setShowFormModal(false);
+        showInfoMessage(
+          editingCustomer ? 'Customer updated successfully' : 'Customer created successfully',
+        );
+        closeFormModal();
         reload(activeSearchRef.current);
       } else {
-        const msg = result.error ?? 'Failed to create customer.';
+        const msg = result.error
+          ?? `Failed to ${editingCustomer ? 'update' : 'create'} customer.`;
         setFormError(msg);
-        showErrorMessage(msg, 'Creation Error');
+        if (Platform.OS === 'ios') {
+          showErrorMessage(msg, editingCustomer ? 'Update Error' : 'Creation Error');
+        }
       }
     } finally {
       isSubmittingRef.current = false;
@@ -291,85 +524,159 @@ export default function CustomersScreen() {
   }));
   // ──────────────────────────────────────────────────────────────────────────
 
-  const renderRow = renderCustomerRow;
-
-  const listHeader = (
-    <View>
-      <SearchField
-        value={search}
-        onChangeText={handleSearchChange}
-        placeholder="Search by name, phone or email…"
-      />
-      {!loading && customers.length > 0 && (
-        <Text style={[styles.listCountText, { color: colors.textMuted }]}>
-          {customers.length}{hasMore ? '+' : ''} {customers.length === 1 ? 'Customer' : 'Customers'}
-        </Text>
-      )}
-    </View>
+  const renderRow = useCallback(
+    ({ item }: ListRenderItemInfo<Customer>) => (
+      <CustomerRow customer={item} onEdit={handleEditCustomer} />
+    ),
+    [handleEditCustomer],
   );
+
+  const countLabel = totalCount === null
+    ? (searching ? 'Searching…' : 'Customers')
+    : `${totalCount.toLocaleString()} ${
+        search.trim()
+          ? (totalCount === 1 ? 'Match' : 'Matches')
+          : (totalCount === 1 ? 'Customer' : 'Customers')
+      }`;
 
   const listFooter = loadingMore ? (
     <View style={styles.footerLoader}>
-      <ActivityIndicator size="small" color={colors.primary} />
+      <BrandSpinner size={24} accessibilityLabel="Loading more customers" />
+    </View>
+  ) : loadMoreError ? (
+    <View style={styles.listErrorContainer}>
+      <Text style={[styles.inlineErrorText, { color: colors.danger }]}>
+        {loadMoreError}
+      </Text>
+      <Button
+        title="Retry"
+        variant="outline"
+        onPress={handleLoadMore}
+        style={styles.retryButton}
+      />
     </View>
   ) : null;
 
   return (
     <ScreenScaffold
       mode="standard"
+      contentContainerStyle={styles.screenContent}
       header={
         <AppHeader
           title="Customers"
-          subtitle="Manage customer records"
+          subtitle="Customer directory"
+          compact
           rightAction={
-            <Button
-              title="+ Add"
-              onPress={() => setShowFormModal(true)}
-              variant="secondary"
-              style={styles.compactHeaderBtn}
-            />
+            <Pressable
+              onPress={openAddCustomer}
+              hitSlop={5}
+              accessibilityRole="button"
+              accessibilityLabel="Add customer"
+              accessibilityHint="Opens the new customer form"
+              android_ripple={{
+                color: 'rgba(230, 164, 107, 0.22)',
+                borderless: false,
+              }}
+              style={({ pressed }) => [
+                styles.headerAddButton,
+                {
+                  borderColor: brandColors.lightCopper,
+                  backgroundColor: pressed
+                    ? 'rgba(230, 164, 107, 0.22)'
+                    : 'rgba(230, 164, 107, 0.10)',
+                  opacity: Platform.OS === 'ios' && pressed ? 0.72 : 1,
+                },
+              ]}
+            >
+              <Text style={styles.headerAddText}>+ Add</Text>
+            </Pressable>
           }
         />
       }
     >
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textMuted }]}>
-            Loading customer directory…
+      <View style={styles.directoryTools}>
+        <SearchField
+          value={search}
+          onChangeText={handleSearchChange}
+          placeholder="Search name, phone or email"
+          compact
+        />
+        <View style={styles.directoryMetaRow}>
+          <Text
+            accessibilityLiveRegion="polite"
+            style={[styles.listCountText, { color: colors.textMuted }]}
+          >
+            {countLabel}
           </Text>
+          {searching ? (
+            <BrandSpinner size={20} accessibilityLabel="Searching customers" />
+          ) : null}
         </View>
-      ) : customers.length === 0 && !search ? (
-        <View style={styles.emptyWrapper}>
-          <EmptyState
-            title="No customers found"
-            message="Your customer directory will appear here. Add your first customer to get started."
-            action={
-              <Button
-                title="Add Customer"
-                onPress={() => setShowFormModal(true)}
-                variant="primary"
-              />
-            }
-            variant="dashboard"
-          />
-        </View>
+      </View>
+
+      {loading ? (
+        <LoadingState message="Loading customer directory…" />
       ) : (
         <FlatList
+          style={styles.list}
           data={customers}
           keyExtractor={item => item.id}
           renderItem={renderRow}
-          ListHeaderComponent={listHeader}
+          ListHeaderComponent={loadError && customers.length > 0 ? (
+            <View style={styles.listErrorContainer}>
+              <Text style={[styles.inlineErrorText, { color: colors.danger }]}>{loadError}</Text>
+              <Button title="Retry" variant="outline" onPress={handleRefresh} style={styles.retryButton} />
+            </View>
+          ) : null}
           ListEmptyComponent={
-            <Text style={[styles.noResultsText, { color: colors.textMuted }]}>
-              No customers match &ldquo;{search}&rdquo;
-            </Text>
+            loadError ? (
+              <View style={styles.listErrorContainer}>
+                <Text style={[styles.inlineErrorText, { color: colors.danger }]}>
+                  {loadError}
+                </Text>
+                <Button
+                  title="Retry"
+                  variant="outline"
+                  onPress={() => reload(activeSearchRef.current)}
+                  style={styles.retryButton}
+                />
+              </View>
+            ) : searching ? (
+              <View style={styles.emptyListLoading}>
+                <BrandSpinner
+                  size={CONTENT_LOADER_SIZE}
+                  accessibilityLabel="Searching customers"
+                />
+              </View>
+            ) : search.trim() ? (
+              <Text style={[styles.noResultsText, { color: colors.textMuted }]}>
+                No customers match &ldquo;{search.trim()}&rdquo;
+              </Text>
+            ) : (
+              <View style={styles.emptyWrapper}>
+                <EmptyState
+                  title="No customers found"
+                  message="Your customer directory will appear here. Add your first customer to get started."
+                  action={
+                    <Button
+                      title="Add Customer"
+                      onPress={openAddCustomer}
+                      variant="primary"
+                    />
+                  }
+                  variant="dashboard"
+                />
+              </View>
+            )
           }
           ListFooterComponent={listFooter}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.4}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
           contentContainerStyle={styles.listContent}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           showsVerticalScrollIndicator={false}
           removeClippedSubviews
         />
@@ -380,7 +687,7 @@ export default function CustomersScreen() {
         visible={showFormModal}
         animationType="fade"
         transparent
-        onRequestClose={() => setShowFormModal(false)}
+        onRequestClose={requestCloseForm}
       >
         {/*
          * On iOS, KeyboardAvoidingView must NOT wrap the transparent overlay.
@@ -391,11 +698,10 @@ export default function CustomersScreen() {
          */}
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView
-            // iOS: 'padding' adds space below the KAV as the keyboard rises.
-            // Android: 'height' shrinks the KAV height — needed because this is a
-            // transparent Modal (separate Dialog window) which does NOT participate in
-            // softwareKeyboardLayoutMode="resize" that applies to the main activity.
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            // Keep this container full-height and pad only the actual keyboard
+            // overlap. This works whether Android's dialog window resizes or not,
+            // while the fixed outer View keeps the backdrop from shifting on iOS.
+            behavior="padding"
             style={styles.modalKAV}
           >
             <Animated.View
@@ -407,9 +713,11 @@ export default function CustomersScreen() {
             >
               {/* Header */}
               <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>Add New Customer</Text>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
+                </Text>
                 <Pressable
-                  onPress={() => setShowFormModal(false)}
+                  onPress={requestCloseForm}
                   hitSlop={12}
                   accessibilityRole="button"
                   accessibilityLabel="Close modal"
@@ -420,7 +728,9 @@ export default function CustomersScreen() {
 
               {/* Scrollable form */}
               <ScrollView
+                style={styles.formScroll}
                 keyboardShouldPersistTaps="handled"
+                keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
                 showsVerticalScrollIndicator
                 contentContainerStyle={styles.formScrollContent}
               >
@@ -435,7 +745,7 @@ export default function CustomersScreen() {
 
                 <FormFieldAnimated delay={MODAL_STAGGER * 1}>
                   <FormInput label="Phone Number *" value={phone} onChangeText={setPhone}
-                    keyboardType="phone-pad" placeholder="e.g. +1 555-0192" />
+                    keyboardType="phone-pad" placeholder="e.g. +61 412 345 678" />
                 </FormFieldAnimated>
 
                 <FormFieldAnimated delay={MODAL_STAGGER * 2}>
@@ -452,7 +762,7 @@ export default function CustomersScreen() {
 
                 <FormFieldAnimated delay={MODAL_STAGGER * 4}>
                   <FormInput label="Notes" value={notes} onChangeText={setNotes}
-                    multiline numberOfLines={2}
+                    multiline numberOfLines={4} style={styles.notesInput}
                     placeholder="Optional customer instructions or contact details" />
                 </FormFieldAnimated>
               </ScrollView>
@@ -460,10 +770,11 @@ export default function CustomersScreen() {
               {/* Sticky footer */}
               <View style={[styles.stickyFooter, { borderTopColor: colors.border }]}>
                 <Button title="Cancel" variant="outline" style={styles.footerBtn}
-                  onPress={() => { resetForm(); setShowFormModal(false); }} />
-                <Button title="Add Customer" variant="primary" style={styles.footerBtn}
+                  onPress={requestCloseForm} />
+                <Button title={editingCustomer ? 'Save Changes' : 'Add Customer'}
+                  variant="primary" style={styles.footerBtn}
                   loading={submitting} disabled={submitting || !isFormValid}
-                  onPress={() => void handleCreateCustomer()} />
+                  onPress={() => void handleSaveCustomer()} />
               </View>
             </Animated.View>
           </KeyboardAvoidingView>
@@ -474,19 +785,38 @@ export default function CustomersScreen() {
 }
 
 const styles = StyleSheet.create({
+  screenContent: {
+    paddingBottom: 0,
+  },
+  list: {
+    flex: 1,
+  },
   // ── List ───────────────────────────────────────────────────────────────────
   listContent: {
-    paddingHorizontal: spacing.xs,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.xl,
+    flexGrow: 1,
+    paddingTop: 2,
+    paddingBottom: 0,
     gap: spacing.xs,
+  },
+  directoryTools: {
+    gap: 2,
+    marginBottom: spacing.xs,
+  },
+  directoryMetaRow: {
+    minHeight: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   listCountText: {
     fontFamily: typography.fontFamily.bodyMedium,
     fontSize: typography.fontSize.xs,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: spacing.xs,
+  },
+  emptyListLoading: {
+    alignItems: 'center',
+    paddingTop: spacing.xl,
   },
   noResultsText: {
     fontFamily: typography.fontFamily.body,
@@ -497,6 +827,20 @@ const styles = StyleSheet.create({
   footerLoader: {
     paddingVertical: spacing.md,
     alignItems: 'center',
+  },
+  listErrorContainer: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+  },
+  inlineErrorText: {
+    fontFamily: typography.fontFamily.bodyMedium,
+    fontSize: typography.fontSize.sm,
+    lineHeight: typography.lineHeight.sm,
+    textAlign: 'center',
+  },
+  retryButton: {
+    minWidth: 112,
   },
   emptyWrapper: {
     flex: 1,
@@ -515,49 +859,90 @@ const styles = StyleSheet.create({
   },
 
   // ── Header button ──────────────────────────────────────────────────────────
-  compactHeaderBtn: {
-    minHeight: 32,
+  headerAddButton: {
+    minHeight: 34,
+    minWidth: 60,
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs / 2,
+    borderWidth: 1,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  headerAddText: {
+    color: brandColors.offWhite,
+    fontFamily: typography.fontFamily.bodySemibold,
+    fontSize: typography.fontSize.xs,
+    lineHeight: typography.lineHeight.xs,
   },
 
   // ── Customer card ──────────────────────────────────────────────────────────
+  customerTilePressable: {
+    borderRadius: radius.md,
+  },
+  customerTilePressed: {
+    transform: [{ scale: 0.995 }],
+  },
   compactCustomerCard: {
-    padding: spacing.sm,
-    gap: spacing.xs / 2,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 7,
+    borderRadius: radius.md,
+    gap: 2,
   },
   iconRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
+    minHeight: typography.lineHeight.xs,
   },
-  cardHeaderRow: {    flexDirection: 'row',
+  cardHeaderRow: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.xs,
   },
+  cardHeaderMeta: {
+    flexShrink: 1,
+    maxWidth: '48%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
   customerName: {
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     fontFamily: typography.fontFamily.headingSemibold,
-    fontSize: typography.fontSize.md,
+    fontSize: 15,
+    lineHeight: typography.lineHeight.sm,
   },
   customerPhone: {
+    flexShrink: 1,
     fontFamily: typography.fontFamily.bodySemibold,
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.xs,
+    lineHeight: typography.lineHeight.xs,
   },
   customerAddress: {
+    flex: 1,
+    flexShrink: 1,
     fontFamily: typography.fontFamily.body,
     fontSize: typography.fontSize.xs,
+    lineHeight: typography.lineHeight.xs,
   },
   customerEmail: {
+    flex: 1,
+    flexShrink: 1,
     fontFamily: typography.fontFamily.body,
     fontSize: typography.fontSize.xs,
+    lineHeight: typography.lineHeight.xs,
   },
   customerNotes: {
+    flex: 1,
+    flexShrink: 1,
     fontFamily: typography.fontFamily.body,
     fontSize: typography.fontSize.xs,
+    lineHeight: typography.lineHeight.xs,
     fontStyle: 'italic',
-    marginTop: 2,
   },
 
   // ── Modal ──────────────────────────────────────────────────────────────────
@@ -568,10 +953,13 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   modalKAV: {
+    flex: 1,
     width: '100%',
-    maxHeight: '85%',
+    justifyContent: 'center',
   },
   modalCard: {
+    maxHeight: '85%',
+    flexShrink: 1,
     borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: 'column',
@@ -595,6 +983,14 @@ const styles = StyleSheet.create({
   formScrollContent: {
     padding: spacing.sm,
     paddingBottom: spacing.md,
+  },
+  formScroll: {
+    flexShrink: 1,
+  },
+  notesInput: {
+    minHeight: 88,
+    paddingTop: spacing.sm,
+    textAlignVertical: 'top',
   },
   errorText: {
     fontFamily: typography.fontFamily.bodyMedium,
