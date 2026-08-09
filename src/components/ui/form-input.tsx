@@ -1,4 +1,9 @@
-import React, { forwardRef, useState } from 'react';
+import React, {
+  forwardRef,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import {
   Platform,
   Pressable,
@@ -47,6 +52,9 @@ export const FormInput = forwardRef<RNTextInput, FormInputProps>(
 
     const [isFocused, setIsFocused] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const inputRef = useRef<RNTextInput>(null);
+
+    useImperativeHandle(ref, () => inputRef.current as RNTextInput);
 
     const borderColor = error
       ? colors.danger
@@ -93,10 +101,15 @@ export const FormInput = forwardRef<RNTextInput, FormInputProps>(
               },
             ],
           ]}
+          onTouchEnd={() => {
+            if (props.editable !== false) {
+              inputRef.current?.focus();
+            }
+          }}
         >
           <RNTextInput
             {...props}
-            ref={ref}
+            ref={inputRef}
             style={[
               styles.input,
               {
