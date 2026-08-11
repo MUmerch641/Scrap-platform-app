@@ -30,6 +30,8 @@ export type AppIconName =
   | 'create-outline'
   | 'close-circle-outline'
   | 'alert-circle-outline'
+  | 'cloud-offline-outline'
+  | 'chevron-back'
   | 'chevron-forward'
   | 'search-outline';
 

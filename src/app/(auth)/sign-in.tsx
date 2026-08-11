@@ -25,7 +25,7 @@ import {
 import { semanticColors, spacing, typography } from '@/shared/theme'
 
 const RECOVERY_SENT_MESSAGE =
-  'If the address can receive recovery email password reset instructions have been sent'
+  'If an account exists for this email address, password reset instructions have been sent.'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -140,7 +140,7 @@ export default function SignInScreen() {
       )
     } catch {
       showErrorMessage(
-        'Unable to connect Check your connection and try again',
+        'Unable to connect. Check your connection and try again.',
         'Sign in failed'
       )
     } finally {
@@ -184,7 +184,7 @@ export default function SignInScreen() {
       )
     } catch {
       showErrorMessage(
-        'Unable to connect Check your connection and try again',
+        'Unable to connect. Check your connection and try again.',
         'Password recovery'
       )
     } finally {

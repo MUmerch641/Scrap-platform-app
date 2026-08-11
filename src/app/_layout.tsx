@@ -15,7 +15,9 @@ import { useColorScheme } from 'react-native';
 
 import { UserRoleProvider } from '@/context/UserRoleContext';
 import { AppDialogProvider } from '@/context/AppDialogContext';
+import { NetworkStatusProvider } from '@/context/NetworkStatusContext';
 import { AuthGate } from '@/components/auth/auth-gate';
+import { OfflineBanner } from '@/components/ui/offline-banner';
 import { semanticColors } from '@/shared/theme';
 
 void SplashScreen.preventAutoHideAsync();
@@ -73,11 +75,14 @@ export default function Layout() {
     <UserRoleProvider>
       <ThemeProvider value={navigationTheme}>
         <AppDialogProvider>
-          <StatusBar style={isDark ? 'light' : 'dark'} />
-          <NavigationBar style="dark" />
-          <AuthGate>
-            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }} />
-          </AuthGate>
+          <NetworkStatusProvider>
+            <StatusBar style={isDark ? 'light' : 'dark'} />
+            <NavigationBar style="dark" />
+            <AuthGate>
+              <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }} />
+            </AuthGate>
+            <OfflineBanner />
+          </NetworkStatusProvider>
         </AppDialogProvider>
       </ThemeProvider>
     </UserRoleProvider>

@@ -66,7 +66,7 @@ export function PickupListCard({ pickup, onPress }: PickupListCardProps) {
           ellipsizeMode="tail"
         >
           {formatPickupCalendarDate(pickup.requestedDate)}
-          {requestedTime ? ` • ${requestedTime}` : ''}
+          {requestedTime ? ` - ${requestedTime}` : ''}
         </Text>
 
         <View style={styles.materialRow}>
@@ -76,7 +76,7 @@ export function PickupListCard({ pickup, onPress }: PickupListCardProps) {
             ellipsizeMode="tail"
           >
             {pickup.materialType}
-            {weight ? ` • ${weight}` : ''}
+            {weight ? ` - ${weight}` : ''}
           </Text>
           <AppIcon name="chevron-forward" size={13} color={colors.textMuted} />
         </View>

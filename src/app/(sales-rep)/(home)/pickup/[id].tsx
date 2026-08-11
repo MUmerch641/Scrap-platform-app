@@ -17,6 +17,8 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ScreenScaffold } from '@/components/ui/screen-scaffold';
+import { OfflineState } from '@/components/ui/offline-state';
+import { useNetworkStatus } from '@/context/NetworkStatusContext';
 import {
   fetchPickupRequestById,
   PickupRequest,
@@ -62,6 +64,7 @@ export default function PickupDetailsScreen() {
   const pickupId = Array.isArray(params.id) ? params.id[0] : params.id;
   const colorScheme = useColorScheme();
   const colors = semanticColors[colorScheme === 'dark' ? 'dark' : 'light'];
+  const { isOffline } = useNetworkStatus();
 
   const [request, setRequest] = useState<PickupRequest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,6 +73,11 @@ export default function PickupDetailsScreen() {
 
   const loadDetails = useCallback(async () => {
     const requestSequence = ++requestSequenceRef.current;
+    if (isOffline) {
+      setLoading(false);
+      setError('No internet connection.');
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -78,13 +86,12 @@ export default function PickupDetailsScreen() {
 
     setLoading(false);
     if (!result.success) {
-      setRequest(null);
       setError(result.error ?? 'Unable to load pickup details.');
       return;
     }
 
     setRequest(result.request ?? null);
-  }, [pickupId]);
+  }, [isOffline, pickupId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -112,8 +119,13 @@ export default function PickupDetailsScreen() {
       )}
     >
       {loading ? (
-        <LoadingState message="Loading pickup details…" />
-      ) : error ? (
+        <LoadingState message="Loading pickup details..." />
+      ) : isOffline && !request ? (
+        <OfflineState
+          message="Connect to the internet to load this pickup."
+          onRetry={() => void loadDetails()}
+        />
+      ) : error && !request ? (
         <EmptyState
           title="Could not load pickup"
           message={error}

@@ -41,6 +41,17 @@ const PROFILE_SELECT = 'id, full_name, email, role, is_active, created_at, updat
 
 export const PASSWORD_RECOVERY_REDIRECT_URL = Linking.createURL('reset-password');
 
+function logPasswordRecoveryError(error: { code?: string; status?: number; message?: string }): void {
+  if (__DEV__) {
+    console.warn('[auth-service] password recovery failed', {
+      operation: 'resetPasswordForEmail',
+      code: error.code ?? 'unknown',
+      status: error.status ?? 'unknown',
+      message: error.message ?? 'unknown',
+    });
+  }
+}
+
 export function getMobileRouteForRole(role: Role): MobileRoute | null {
   if (role === ROLES.DRIVER) return '/(driver)';
   if (role === ROLES.SALES_REP) return '/(sales-rep)/(home)';
@@ -174,6 +185,8 @@ export async function requestPasswordRecovery(emailInput: string): Promise<AuthA
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: PASSWORD_RECOVERY_REDIRECT_URL,
     });
+
+    if (error) logPasswordRecoveryError(error);
 
     return error
       ? { success: false, error: 'Unable to send a recovery email right now. Try again later.' }

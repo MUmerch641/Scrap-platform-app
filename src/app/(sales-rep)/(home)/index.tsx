@@ -17,6 +17,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useUserRole } from '@/context/UserRoleContext';
+import { useNetworkStatus } from '@/context/NetworkStatusContext';
 import { PickupListCard } from '@/components/pickups/pickup-list-card';
 import { AppHeader } from '@/components/ui/app-header';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ScreenScaffold } from '@/components/ui/screen-scaffold';
+import { StaggeredFadeIn } from '@/components/ui/staggered-fade-in';
 import {
     fetchPickupDashboard,
     PickupMetrics,
@@ -123,17 +125,23 @@ export default function SalesRepHomeScreen() {
   const colorScheme = useColorScheme();
   const isDark      = colorScheme === 'dark';
   const colors      = semanticColors[isDark ? 'dark' : 'light'];
+  const { isOffline } = useNetworkStatus();
 
   const [requests, setRequests] = useState<PickupRequest[]>([]);
   const [metrics,  setMetrics]  = useState<PickupMetrics>(DEFAULT_METRICS);
   const [loadingRecent, setLoadingRecent] = useState(true);
   const [recentError, setRecentError] = useState<string | null>(null);
   const [metricsError, setMetricsError] = useState<string | null>(null);
+  const [recentAnimationKey, setRecentAnimationKey] = useState(0);
   const requestSequenceRef = useRef(0);
   const hasRecentRef = useRef(false);
 
   const loadData = useCallback(async () => {
     const requestSequence = ++requestSequenceRef.current;
+    if (isOffline) {
+      setLoadingRecent(false);
+      return;
+    }
     setLoadingRecent(!hasRecentRef.current);
     setRecentError(null);
     setMetricsError(null);
@@ -144,6 +152,7 @@ export default function SalesRepHomeScreen() {
     if (result.requestsSuccess) {
       setRequests(result.requests);
       hasRecentRef.current = result.requests.length > 0;
+      setRecentAnimationKey((currentValue) => currentValue + 1);
     } else {
       setRecentError(result.requestsError ?? 'Unable to load recent pickups.');
     }
@@ -152,7 +161,7 @@ export default function SalesRepHomeScreen() {
     } else {
       setMetricsError(result.metricsError ?? 'Unable to load pickup counts.');
     }
-  }, []);
+  }, [isOffline]);
 
   useFocusEffect(
     useCallback(() => {
@@ -255,7 +264,7 @@ export default function SalesRepHomeScreen() {
         {/* ── Recent pickups content ─────────────────────────────────────── */}
         <FadeSlide delay={S_RECENT_CARD * STAGGER_MS}>
           {loadingRecent ? (
-            <LoadingState message="Loading recent pickups…" />
+            <LoadingState message="Loading recent pickups..." />
           ) : recentError && requests.length === 0 ? (
             <EmptyState
               title="Could not load recent pickups"
@@ -276,12 +285,17 @@ export default function SalesRepHomeScreen() {
               {recentError ? (
                 <Button title="Retry recent pickups" variant="outline" onPress={() => void loadData()} />
               ) : null}
-              {requests.map((request) => (
-                <PickupListCard
-                  key={request.id}
-                  pickup={request}
-                  onPress={handlePickupPress}
-                />
+              {requests.map((request, index) => (
+                <StaggeredFadeIn
+                  key={`${request.id}-${recentAnimationKey}`}
+                  index={index}
+                  runKey={recentAnimationKey}
+                >
+                  <PickupListCard
+                    pickup={request}
+                    onPress={handlePickupPress}
+                  />
+                </StaggeredFadeIn>
               ))}
             </View>
           )}

@@ -24,6 +24,9 @@ import {
 } from '@/components/ui/loading-state';
 import { ScreenScaffold } from '@/components/ui/screen-scaffold';
 import { SearchField } from '@/components/ui/search-field';
+import { StaggeredFadeIn } from '@/components/ui/staggered-fade-in';
+import { OfflineState } from '@/components/ui/offline-state';
+import { useNetworkStatus } from '@/context/NetworkStatusContext';
 import {
   fetchPickupRequestsPage,
   PickupRequest,
@@ -34,10 +37,36 @@ import { radius, semanticColors, spacing, typography } from '@/shared/theme';
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 350;
 
+interface AnimatedPickupRowProps {
+  pickup: PickupRequest;
+  index: number;
+  runKey: number;
+  onPress: (pickup: PickupRequest) => void;
+}
+
+const AnimatedPickupRow = React.memo(function AnimatedPickupRow({
+  pickup,
+  index,
+  runKey,
+  onPress,
+}: AnimatedPickupRowProps) {
+  return (
+    <StaggeredFadeIn index={index} runKey={runKey}>
+      <PickupListCard pickup={pickup} onPress={onPress} />
+    </StaggeredFadeIn>
+  );
+}, (previous, next) => (
+  previous.pickup === next.pickup
+  && previous.index === next.index
+  && previous.runKey === next.runKey
+  && previous.onPress === next.onPress
+));
+
 export default function MyPickupsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = semanticColors[colorScheme === 'dark' ? 'dark' : 'light'];
+  const { isOffline } = useNetworkStatus();
 
   const [requests, setRequests] = useState<PickupRequest[]>([]);
   const [search, setSearch] = useState('');
@@ -51,6 +80,7 @@ export default function MyPickupsScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const [listAnimationKey, setListAnimationKey] = useState(0);
 
   const currentPageRef = useRef(0);
   const activeSearchRef = useRef('');
@@ -69,6 +99,16 @@ export default function MyPickupsScreen() {
     isRefresh = false,
   ) => {
     const requestSequence = ++requestSequenceRef.current;
+
+    if (isOffline) {
+      setLoading(false);
+      setQuerying(false);
+      setRefreshing(false);
+      setLoadingMore(false);
+      isLoadingMoreRef.current = false;
+      if (!hasRecordsRef.current) setLoadError('No internet connection.');
+      return;
+    }
 
     if (append) {
       isLoadingMoreRef.current = true;
@@ -123,6 +163,9 @@ export default function MyPickupsScreen() {
     setRefreshError(null);
     setHasMore(result.hasMore);
     if (page === 0) setTotalCount(result.totalCount ?? null);
+    if (page === 0 && !append) {
+      setListAnimationKey((currentValue) => currentValue + 1);
+    }
     currentPageRef.current = page;
     setRequests((previous) => {
       const existingIds = new Set(previous.map((request) => request.id));
@@ -135,7 +178,7 @@ export default function MyPickupsScreen() {
       hasRecordsRef.current = nextRequests.length > 0;
       return nextRequests;
     });
-  }, []);
+  }, [isOffline]);
 
   const reload = useCallback((
     searchTerm: string,
@@ -178,12 +221,11 @@ export default function MyPickupsScreen() {
 
   const handleSearchChange = (text: string) => {
     setSearch(text);
+    if (isOffline) return;
     activeSearchRef.current = text.trim();
     setQuerying(true);
     setTotalCount(null);
     resetInFlightState();
-    hasRecordsRef.current = false;
-    setRequests([]);
     setLoadError(null);
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     searchDebounceRef.current = setTimeout(() => {
@@ -193,12 +235,11 @@ export default function MyPickupsScreen() {
 
   const handleStatusChange = (nextStatus: PickupStatusFilter) => {
     if (nextStatus === status) return;
+    if (isOffline) return;
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     resetInFlightState();
     setStatus(nextStatus);
     activeStatusRef.current = nextStatus;
-    hasRecordsRef.current = false;
-    setRequests([]);
     setLoadError(null);
     reload(search.trim(), nextStatus);
   };
@@ -210,7 +251,7 @@ export default function MyPickupsScreen() {
   };
 
   const handleLoadMore = () => {
-    if (isLoadingMoreRef.current || loadingMore || !hasMore || querying || refreshing) return;
+    if (isOffline || isLoadingMoreRef.current || loadingMore || !hasMore || querying || refreshing) return;
     void loadPage(
       activeSearchRef.current,
       activeStatusRef.current,
@@ -227,14 +268,19 @@ export default function MyPickupsScreen() {
   }, [router]);
 
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<PickupRequest>) => (
-      <PickupListCard pickup={item} onPress={handlePickupPress} />
+    ({ item, index }: ListRenderItemInfo<PickupRequest>) => (
+      <AnimatedPickupRow
+        pickup={item}
+        index={index}
+        runKey={listAnimationKey}
+        onPress={handlePickupPress}
+      />
     ),
-    [handlePickupPress],
+    [handlePickupPress, listAnimationKey],
   );
 
   const countLabel = totalCount === null
-    ? (querying ? 'Searching…' : 'Pickups')
+    ? (querying ? 'Searching...' : 'Pickups')
     : `${totalCount.toLocaleString()} ${
         search.trim() || status !== 'all'
           ? (totalCount === 1 ? 'Result' : 'Results')
@@ -247,7 +293,7 @@ export default function MyPickupsScreen() {
     <View style={styles.footerContainer}>
       <BrandSpinner size={24} accessibilityLabel="Loading more pickups" />
     </View>
-  ) : loadMoreError ? (
+  ) : !isOffline && loadMoreError ? (
     <View style={styles.footerContainer}>
       <Text style={[styles.errorText, { color: colors.danger }]}>{loadMoreError}</Text>
       <Button title="Retry" variant="outline" onPress={handleLoadMore} style={styles.retryButton} />
@@ -324,7 +370,7 @@ export default function MyPickupsScreen() {
           </Text>
         </View>
 
-        {refreshError ? (
+        {!isOffline && refreshError ? (
           <Pressable
             onPress={handleRefresh}
             accessibilityRole="button"
@@ -339,7 +385,12 @@ export default function MyPickupsScreen() {
       </View>
 
       {loading ? (
-        <LoadingState message="Loading pickups…" />
+        <LoadingState message="Loading pickups..." />
+      ) : isOffline && requests.length === 0 ? (
+        <OfflineState
+          message="Connect to the internet to load your pickups."
+          onRetry={handleRefresh}
+        />
       ) : (
         <FlatList
           style={styles.list}
@@ -347,7 +398,12 @@ export default function MyPickupsScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           ListEmptyComponent={
-            loadError ? (
+            isOffline ? (
+              <OfflineState
+                message="Connect to the internet to load your pickups."
+                onRetry={handleRefresh}
+              />
+            ) : loadError ? (
               <View style={styles.errorState}>
                 <Text style={[styles.errorText, { color: colors.danger }]}>{loadError}</Text>
                 <Button

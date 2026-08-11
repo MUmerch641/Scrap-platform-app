@@ -31,6 +31,8 @@ import {
   LoadingState,
 } from '@/components/ui/loading-state';
 import { ScreenScaffold } from '@/components/ui/screen-scaffold';
+import { OfflineState } from '@/components/ui/offline-state';
+import { useNetworkStatus } from '@/context/NetworkStatusContext';
 import { SearchField } from '@/components/ui/search-field';
 import {
   Customer,
@@ -105,6 +107,7 @@ function CustomerSelectorModal({ visible, onClose, onSelect }: CustomerSelectorM
   const colorScheme = useColorScheme();
   const isDark      = colorScheme === 'dark';
   const colors      = semanticColors[isDark ? 'dark' : 'light'];
+  const { isOffline } = useNetworkStatus();
 
   const [search,      setSearch]      = useState('');
   const [customers,   setCustomers]   = useState<Customer[]>([]);
@@ -125,6 +128,12 @@ function CustomerSelectorModal({ visible, onClose, onSelect }: CustomerSelectorM
   // Load a page of customers into the selector
   const loadPage = useCallback(async (term: string, page: number, append: boolean) => {
     const requestSequence = ++requestSequenceRef.current;
+    if (isOffline) {
+      setLoading(false);
+      setLoadingMore(false);
+      isLoadingMoreRef.current = false;
+      return;
+    }
     if (page === 0) setLoading(true);
     else {
       isLoadingMoreRef.current = true;
@@ -163,7 +172,7 @@ function CustomerSelectorModal({ visible, onClose, onSelect }: CustomerSelectorM
         ...result.customers.filter((customer) => !existingIds.has(customer.id)),
       ];
     });
-  }, []);
+  }, [isOffline]);
 
   // Trigger reset+load only on the rising edge (modal just opened).
   // All setState calls here are inside an async callback, not synchronous in the effect body.
@@ -198,6 +207,7 @@ function CustomerSelectorModal({ visible, onClose, onSelect }: CustomerSelectorM
 
   const handleSearchChange = (text: string) => {
     setSearch(text);
+    if (isOffline) return;
     requestSequenceRef.current += 1;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
@@ -208,7 +218,7 @@ function CustomerSelectorModal({ visible, onClose, onSelect }: CustomerSelectorM
   };
 
   const handleLoadMore = () => {
-    if (isLoadingMoreRef.current || loadingMore || !hasMore) return;
+    if (isOffline || isLoadingMoreRef.current || loadingMore || !hasMore) return;
     void loadPage(activeSearchRef.current, pageRef.current + 1, true);
   };
 
@@ -286,7 +296,7 @@ function CustomerSelectorModal({ visible, onClose, onSelect }: CustomerSelectorM
           <SearchField
             value={search}
             onChangeText={handleSearchChange}
-            placeholder="Search by name, phone or email…"
+            placeholder="Search by name, phone or email..."
           />
         </View>
 
@@ -379,9 +389,9 @@ function CustomerSelectorField({ selected, onPress, colors }: CustomerSelectorFi
         ) : (
           <View style={styles.selectorTriggerContent}>
             <Text style={[styles.selectorTriggerPlaceholder, { color: colors.inputPlaceholder }]}>
-              Select a customer…
+              Select a customer...
             </Text>
-            <Text style={[styles.selectorTriggerChevron, { color: colors.textMuted }]}>›</Text>
+            <AppIcon name="chevron-forward" size={18} color={colors.textMuted} />
           </View>
         )}
       </Pressable>
@@ -408,6 +418,7 @@ export default function CreatePickupScreen() {
   const colorScheme = useColorScheme();
   const isDark      = colorScheme === 'dark';
   const colors      = getColors(isDark);
+  const { isOffline } = useNetworkStatus();
 
   // Customer selector state
   const [selectedCustomer,    setSelectedCustomer]    = useState<Customer | null>(null);
@@ -436,6 +447,11 @@ export default function CreatePickupScreen() {
   // This bounded one-row check supports the empty state without loading the directory.
   const checkCustomers = useCallback(async () => {
     const requestSequence = ++customerAvailabilityRequestRef.current;
+    if (isOffline) {
+      setCheckingCustomers(false);
+      setCustomerAvailability('error');
+      return;
+    }
     setCheckingCustomers(true);
     const result = await fetchCustomersPage('', 0, 1);
     if (requestSequence !== customerAvailabilityRequestRef.current) return;
@@ -446,7 +462,7 @@ export default function CreatePickupScreen() {
     } else {
       setCustomerAvailability('error');
     }
-  }, []);
+  }, [isOffline]);
 
   useFocusEffect(
     useCallback(() => {
@@ -489,6 +505,11 @@ export default function CreatePickupScreen() {
     });
     if (!validation.success) {
       setFormError(validation.error);
+      return;
+    }
+
+    if (isOffline) {
+      setFormError('No internet connection. Your information is still here. Reconnect and try again.');
       return;
     }
 
@@ -545,7 +566,7 @@ export default function CreatePickupScreen() {
   if (customerAvailability === 'loading') {
     return (
       <ScreenScaffold mode="scroll" header={<AppHeader title="Create Pickup" subtitle="New pickup request" />}>
-        <LoadingState message="Loading customer directory…" />
+        <LoadingState message="Loading customer directory..." />
       </ScreenScaffold>
     );
   }
@@ -553,20 +574,28 @@ export default function CreatePickupScreen() {
   if (customerAvailability === 'error') {
     return (
       <ScreenScaffold mode="scroll" header={<AppHeader title="Create Pickup" subtitle="New pickup request" />}>
-        <EmptyState
-          title="Could not load customers"
-          message="Check your connection and try again."
-          action={
-            <Button
-              title="Retry"
-              variant="primary"
-              loading={checkingCustomers}
-              disabled={checkingCustomers}
-              onPress={() => void checkCustomers()}
-            />
-          }
-          variant="dashboard"
-        />
+        {isOffline ? (
+          <OfflineState
+            message="Connect to the internet to load your customers."
+            onRetry={() => void checkCustomers()}
+            loading={checkingCustomers}
+          />
+        ) : (
+          <EmptyState
+            title="Could not load customers"
+            message="Check your connection and try again."
+            action={
+              <Button
+                title="Retry"
+                variant="primary"
+                loading={checkingCustomers}
+                disabled={checkingCustomers}
+                onPress={() => void checkCustomers()}
+              />
+            }
+            variant="dashboard"
+          />
+        )}
       </ScreenScaffold>
     );
   }
@@ -715,7 +744,7 @@ export default function CreatePickupScreen() {
             onChangeText={setNotes}
             multiline
             numberOfLines={3}
-            placeholder="Access code, loading dock details, site instructions…"
+            placeholder="Access code, loading dock details, site instructions..."
           />
         </FormCard>
 

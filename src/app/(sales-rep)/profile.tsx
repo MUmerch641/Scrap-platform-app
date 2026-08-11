@@ -2,12 +2,12 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import Animated, {
-    Easing,
-    useAnimatedStyle,
-    useSharedValue,
-    withDelay,
-    withSpring,
-    withTiming,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 
 import { useUserRole } from '@/context/UserRoleContext';
@@ -19,35 +19,32 @@ import { ScreenScaffold } from '@/components/ui/screen-scaffold';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { requestPasswordRecovery } from '@/services/auth-service';
 import {
-    showErrorMessage,
-    showInfoMessage,
-    showNativeActionSheet,
+  showErrorMessage,
+  showInfoMessage,
+  showNativeActionSheet,
 } from '@/services/native-feedback-service';
 import { ROLES } from '@/shared/roles';
 import { brandColors, radius, semanticColors, spacing, typography } from '@/shared/theme';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/** Convert internal role enum to user-facing label */
 function roleLabel(role: string): string {
   switch (role) {
-    case ROLES.SALES_REP:          return 'Sales Representative';
-    case ROLES.DRIVER:             return 'Driver';
-    case ROLES.ADMIN_OPERATIONS:   return 'Admin – Operations';
-    case ROLES.HEAD_OPERATIONS:    return 'Head of Operations';
-    case ROLES.ASSISTANT:          return 'Assistant';
-    case ROLES.SUPER_ADMIN:        return 'Super Admin';
-    default:                       return role;
+    case ROLES.SALES_REP:
+      return 'Sales Representative';
+    case ROLES.DRIVER:
+      return 'Driver';
+    case ROLES.ADMIN_OPERATIONS:
+      return 'Admin - Operations';
+    case ROLES.HEAD_OPERATIONS:
+      return 'Head of Operations';
+    case ROLES.ASSISTANT:
+      return 'Assistant';
+    case ROLES.SUPER_ADMIN:
+      return 'Super Admin';
+    default:
+      return role;
   }
 }
 
-/**
- * Derive initials from a full name.
- * "Ray Smith"      → "RS"
- * "Muhammad Umer"  → "MU"
- * "Alice"          → "A"
- * null/empty       → "?"
- */
 function getInitials(fullName: string | null | undefined): string {
   if (!fullName?.trim()) return '?';
   const parts = fullName.trim().split(/\s+/);
@@ -55,62 +52,80 @@ function getInitials(fullName: string | null | undefined): string {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 }
 
-// ── Animation constants ───────────────────────────────────────────────────────
 const DURATION = 340;
-const EASE     = Easing.out(Easing.cubic);
+const EASE = Easing.out(Easing.cubic);
 
-interface FadeSlideProps { children: React.ReactNode; delay: number; run: boolean; }
+interface FadeSlideProps {
+  children: React.ReactNode;
+  delay: number;
+  run: boolean;
+}
+
 function FadeSlide({ children, delay, run }: FadeSlideProps) {
-  const opacity    = useSharedValue(0);
+  const opacity = useSharedValue(0);
   const translateY = useSharedValue(12);
+
   React.useEffect(() => {
     if (!run) return;
-    opacity.value    = 0;
+    opacity.value = 0;
     translateY.value = 12;
-    opacity.value    = withDelay(delay, withTiming(1, { duration: DURATION, easing: EASE }));
+    opacity.value = withDelay(delay, withTiming(1, { duration: DURATION, easing: EASE }));
     translateY.value = withDelay(delay, withTiming(0, { duration: DURATION, easing: EASE }));
   }, [run, delay, opacity, translateY]);
+
   const style = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ translateY: translateY.value }],
   }));
+
   return <Animated.View style={style}>{children}</Animated.View>;
 }
 
-interface ScaleInProps { children: React.ReactNode; delay: number; run: boolean; }
+interface ScaleInProps {
+  children: React.ReactNode;
+  delay: number;
+  run: boolean;
+}
+
 function ScaleIn({ children, delay, run }: ScaleInProps) {
   const opacity = useSharedValue(0);
-  const scale   = useSharedValue(0.82);
+  const scale = useSharedValue(0.82);
+
   React.useEffect(() => {
     if (!run) return;
     opacity.value = 0;
-    scale.value   = 0.82;
+    scale.value = 0.82;
     opacity.value = withDelay(delay, withTiming(1, { duration: DURATION, easing: EASE }));
-    scale.value   = withDelay(delay, withSpring(1, { mass: 0.5, stiffness: 220, damping: 18 }));
+    scale.value = withDelay(delay, withSpring(1, { mass: 0.5, stiffness: 220, damping: 18 }));
   }, [run, delay, opacity, scale]);
+
   const style = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ scale: scale.value }],
   }));
+
   return <Animated.View style={style}>{children}</Animated.View>;
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
-// ── InfoRow — label / value row inside a card ─────────────────────────────────
 interface InfoRowProps {
   label: string;
   value: React.ReactNode;
   noBorder?: boolean;
 }
+
 function InfoRow({ label, value, noBorder = false }: InfoRowProps) {
   const colorScheme = useColorScheme();
-  const isDark      = colorScheme === 'dark';
-  const colors      = semanticColors[isDark ? 'dark' : 'light'];
+  const isDark = colorScheme === 'dark';
+  const colors = semanticColors[isDark ? 'dark' : 'light'];
+
   return (
     <View
       style={[
         styles.infoRow,
-        !noBorder && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+        !noBorder && {
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.border,
+        },
       ]}
     >
       <Text style={[styles.infoLabel, { color: colors.textMuted }]}>{label}</Text>
@@ -122,41 +137,35 @@ function InfoRow({ label, value, noBorder = false }: InfoRowProps) {
     </View>
   );
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
 export default function SalesRepProfileScreen() {
-  const router      = useRouter();
+  const router = useRouter();
   const { userProfile, signOut } = useUserRole();
   const { showDialog } = useAppDialog();
   const colorScheme = useColorScheme();
-  const isDark      = colorScheme === 'dark';
-  const colors      = semanticColors[isDark ? 'dark' : 'light'];
+  const isDark = colorScheme === 'dark';
+  const colors = semanticColors[isDark ? 'dark' : 'light'];
 
   const [resettingPassword, setResettingPassword] = useState(false);
-  const [signingOut,        setSigningOut]         = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const signOutInProgressRef = useRef(false);
 
-  // ── Trigger animations on every focus ─────────────────────────────────────
   const [animRun, setAnimRun] = useState(false);
   useFocusEffect(
     useCallback(() => {
       setAnimRun(false);
-      // tiny defer so reset frame renders before re-animating
-      const t = setTimeout(() => setAnimRun(true), 16);
-      return () => clearTimeout(t);
-    }, [])
+      const timeout = setTimeout(() => setAnimRun(true), 16);
+      return () => clearTimeout(timeout);
+    }, []),
   );
 
-  // ── Derived display values ─────────────────────────────────────────────────
-  const fullName    = userProfile?.fullName?.trim() || null;
+  const fullName = userProfile?.fullName?.trim() || null;
   const displayName = fullName ?? 'Sales Representative';
-  const initials    = getInitials(fullName);
-  const email       = userProfile?.email ?? '';
-  const role        = userProfile?.role ?? ROLES.SALES_REP;
-  const isActive    = userProfile?.isActive ?? true;
-  // ──────────────────────────────────────────────────────────────────────────
+  const initials = getInitials(fullName);
+  const email = userProfile?.email ?? '';
+  const role = userProfile?.role ?? ROLES.SALES_REP;
+  const isActive = userProfile?.isActive ?? true;
 
-  // ── Reset password ─────────────────────────────────────────────────────────
   const handleResetPassword = async () => {
     if (resettingPassword || !email) return;
     setResettingPassword(true);
@@ -171,9 +180,7 @@ export default function SalesRepProfileScreen() {
       setResettingPassword(false);
     }
   };
-  // ──────────────────────────────────────────────────────────────────────────
 
-  // ── Sign out ───────────────────────────────────────────────────────────────
   const doSignOut = async () => {
     if (signOutInProgressRef.current) return;
     signOutInProgressRef.current = true;
@@ -193,26 +200,21 @@ export default function SalesRepProfileScreen() {
   const handleSignOut = () => {
     if (signingOut) return;
     if (Platform.OS === 'ios') {
-      showNativeActionSheet(
-        'Sign Out',
-        ['Sign Out', 'Cancel'],
-        1,
-        () => void doSignOut()
-      );
-    } else {
-      showDialog({
-        title: 'Sign out',
-        message: 'Are you sure you want to sign out?',
-        confirmLabel: 'Sign Out',
-        cancelLabel: 'Cancel',
-        destructive: true,
-        icon: 'log-out-outline',
-        dismissible: false,
-        onConfirm: doSignOut,
-      });
+      showNativeActionSheet('Sign Out', ['Sign Out', 'Cancel'], 1, () => void doSignOut());
+      return;
     }
+
+    showDialog({
+      title: 'Sign out',
+      message: 'Are you sure you want to sign out?',
+      confirmLabel: 'Sign Out',
+      cancelLabel: 'Cancel',
+      destructive: true,
+      icon: 'log-out-outline',
+      dismissible: false,
+      onConfirm: doSignOut,
+    });
   };
-  // ──────────────────────────────────────────────────────────────────────────
 
   return (
     <ScreenScaffold
@@ -220,52 +222,45 @@ export default function SalesRepProfileScreen() {
       header={<AppHeader title="Profile" subtitle="Account and preferences" />}
     >
       <View style={styles.container}>
-
-        {/* ── Identity section ──────────────────────────────────────────── */}
         <FadeSlide delay={0} run={animRun}>
           <View style={styles.identitySection}>
-            {/* Avatar — scale pop */}
             <ScaleIn delay={0} run={animRun}>
-              <View style={[
-                styles.avatar,
-                { backgroundColor: isDark ? brandColors.copper : brandColors.navy },
-              ]}>
-                <Text style={[
-                  styles.avatarText,
-                  { color: isDark ? brandColors.navy : brandColors.white },
-                ]}>
+              <View
+                style={[
+                  styles.avatar,
+                  { backgroundColor: isDark ? brandColors.copper : brandColors.navy },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.avatarText,
+                    { color: isDark ? brandColors.navy : brandColors.white },
+                  ]}
+                >
                   {initials}
                 </Text>
               </View>
             </ScaleIn>
 
-            {/* Name + role + email — fade slide after avatar */}
             <FadeSlide delay={80} run={animRun}>
               <View style={styles.identityText}>
-                <Text style={[styles.displayName, { color: colors.text }]}>
-                  {displayName}
-                </Text>
+                <Text style={[styles.displayName, { color: colors.text }]}>{displayName}</Text>
                 <Text style={[styles.roleSubtitle, { color: colors.textMuted }]}>
                   {roleLabel(role)}
                 </Text>
                 {email ? (
-                  <Text style={[styles.emailSubtitle, { color: colors.textMuted }]}>
-                    {email}
-                  </Text>
+                  <Text style={[styles.emailSubtitle, { color: colors.textMuted }]}>{email}</Text>
                 ) : null}
               </View>
             </FadeSlide>
           </View>
         </FadeSlide>
 
-        {/* ── Account section ───────────────────────────────────────────── */}
         <FadeSlide delay={60} run={animRun}>
           <View style={styles.sectionBlock}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-              Account
-            </Text>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Account</Text>
             <Card style={styles.infoCard}>
-              <InfoRow label="Role"   value={roleLabel(role)} />
+              <InfoRow label="Role" value={roleLabel(role)} />
               <InfoRow
                 label="Status"
                 value={
@@ -275,29 +270,24 @@ export default function SalesRepProfileScreen() {
                   />
                 }
               />
-              <InfoRow label="Email"  value={email || '—'} noBorder />
+              <InfoRow label="Email" value={email || 'Not available'} noBorder />
             </Card>
           </View>
         </FadeSlide>
 
-        {/* ── Security section ──────────────────────────────────────────── */}
         <FadeSlide delay={120} run={animRun}>
           <View style={styles.sectionBlock}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-              Security
-            </Text>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Security</Text>
             <Card style={styles.infoCard}>
               <View style={styles.securityRow}>
                 <View style={styles.securityText}>
-                  <Text style={[styles.securityTitle, { color: colors.text }]}>
-                    Reset Password
-                  </Text>
+                  <Text style={[styles.securityTitle, { color: colors.text }]}>Reset Password</Text>
                   <Text style={[styles.securitySubtitle, { color: colors.textMuted }]}>
                     Send a reset link to your email
                   </Text>
                 </View>
                 <Button
-                  title={resettingPassword ? 'Sending…' : 'Send Link'}
+                  title={resettingPassword ? 'Sending...' : 'Send Link'}
                   onPress={() => void handleResetPassword()}
                   variant="outline"
                   disabled={resettingPassword || !email}
@@ -309,7 +299,6 @@ export default function SalesRepProfileScreen() {
           </View>
         </FadeSlide>
 
-        {/* ── Sign out ──────────────────────────────────────────────────── */}
         <FadeSlide delay={180} run={animRun}>
           <Button
             title="Sign Out"
@@ -320,7 +309,6 @@ export default function SalesRepProfileScreen() {
             style={styles.signOutButton}
           />
         </FadeSlide>
-
       </View>
     </ScreenScaffold>
   );
@@ -330,8 +318,6 @@ const styles = StyleSheet.create({
   container: {
     gap: spacing.lg,
   },
-
-  // ── Identity ───────────────────────────────────────────────────────────────
   identitySection: {
     alignItems: 'center',
     paddingVertical: spacing.md,
@@ -369,8 +355,6 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.xs,
     textAlign: 'center',
   },
-
-  // ── Sections ───────────────────────────────────────────────────────────────
   sectionBlock: {
     gap: spacing.xs,
   },
@@ -386,8 +370,6 @@ const styles = StyleSheet.create({
     gap: 0,
     overflow: 'hidden',
   },
-
-  // ── Info rows ──────────────────────────────────────────────────────────────
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -408,8 +390,6 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     flexShrink: 1,
   },
-
-  // ── Security ───────────────────────────────────────────────────────────────
   securityRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -435,8 +415,6 @@ const styles = StyleSheet.create({
     minHeight: 36,
     paddingHorizontal: spacing.sm,
   },
-
-  // ── Sign out ───────────────────────────────────────────────────────────────
   signOutButton: {
     marginTop: spacing.xs,
   },

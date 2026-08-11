@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/loading-state';
 import { ScreenScaffold } from '@/components/ui/screen-scaffold';
 import { SearchField } from '@/components/ui/search-field';
+import { StaggeredFadeIn } from '@/components/ui/staggered-fade-in';
 import {
     createCustomer,
     Customer,
@@ -45,6 +46,8 @@ import {
 } from '@/services/customer-service';
 import { createClientRequestId } from '@/shared/client-request-id';
 import { useAppDialog } from '@/context/AppDialogContext';
+import { useNetworkStatus } from '@/context/NetworkStatusContext';
+import { OfflineState } from '@/components/ui/offline-state';
 import {
     showErrorMessage,
     showInfoMessage,
@@ -143,6 +146,31 @@ const CustomerRow = React.memo(function CustomerRow({ customer, onEdit }: Custom
     </Pressable>
   );
 });
+
+interface AnimatedCustomerRowProps {
+  customer: Customer;
+  index: number;
+  runKey: number;
+  onEdit: (customer: Customer) => void;
+}
+
+const AnimatedCustomerRow = React.memo(function AnimatedCustomerRow({
+  customer,
+  index,
+  runKey,
+  onEdit,
+}: AnimatedCustomerRowProps) {
+  return (
+    <StaggeredFadeIn index={index} runKey={runKey}>
+      <CustomerRow customer={customer} onEdit={onEdit} />
+    </StaggeredFadeIn>
+  );
+}, (previous, next) => (
+  previous.customer === next.customer
+  && previous.index === next.index
+  && previous.runKey === next.runKey
+  && previous.onEdit === next.onEdit
+));
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Modal form fields with staggered entrance ────────────────────────────────
@@ -180,6 +208,7 @@ function FormFieldAnimated({ delay, children }: FormFieldAnimatedProps) {
 export default function CustomersScreen() {
   const colors = useColors();
   const { showDialog } = useAppDialog();
+  const { isOffline } = useNetworkStatus();
 
   // ── List state ─────────────────────────────────────────────────────────────
   const [customers, setCustomers]   = useState<Customer[]>([]);
@@ -192,6 +221,7 @@ export default function CustomersScreen() {
   const [totalCount, setTotalCount] = useState<number | null>(null);
   const [loadError, setLoadError]   = useState<string | null>(null);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const [listAnimationKey, setListAnimationKey] = useState(0);
   const currentPageRef              = useRef(0);
   const activeSearchRef             = useRef('');
   const searchDebounceRef           = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -227,6 +257,15 @@ export default function CustomersScreen() {
     isRefresh = false,
   ) => {
     const requestSequence = ++requestSequenceRef.current;
+    if (isOffline) {
+      setLoading(false);
+      setSearching(false);
+      setRefreshing(false);
+      setLoadingMore(false);
+      isLoadingMoreRef.current = false;
+      if (!hasRecordsRef.current) setLoadError('No internet connection.');
+      return;
+    }
     if (isRefresh) setRefreshing(true);
     else if (page === 0 && !append) {
       if (hasLoadedRef.current) setSearching(true);
@@ -272,6 +311,9 @@ export default function CustomersScreen() {
 
     setHasMore(result.hasMore);
     if (page === 0) setTotalCount(result.totalCount ?? result.customers.length);
+    if (page === 0 && !append) {
+      setListAnimationKey((currentValue) => currentValue + 1);
+    }
     currentPageRef.current = page;
     setCustomers((previous) => {
       if (!append) {
@@ -286,7 +328,7 @@ export default function CustomersScreen() {
       hasRecordsRef.current = nextCustomers.length > 0;
       return nextCustomers;
     });
-  }, []);
+  }, [isOffline]);
 
   const reload = useCallback((term: string) => {
     activeSearchRef.current = term;
@@ -307,6 +349,7 @@ export default function CustomersScreen() {
 
   const handleSearchChange = (text: string) => {
     setSearch(text);
+    if (isOffline) return;
     setSearching(true);
     setTotalCount(null);
     requestSequenceRef.current += 1;
@@ -315,8 +358,6 @@ export default function CustomersScreen() {
     setRefreshing(false);
     setLoadMoreError(null);
     setLoadError(null);
-    hasRecordsRef.current = false;
-    setCustomers([]);
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     searchDebounceRef.current = setTimeout(() => {
       reload(text.trim());
@@ -324,7 +365,7 @@ export default function CustomersScreen() {
   };
 
   const handleLoadMore = () => {
-    if (isLoadingMoreRef.current || loadingMore || !hasMore) return;
+    if (isOffline || isLoadingMoreRef.current || loadingMore || !hasMore) return;
     void loadPage(activeSearchRef.current, currentPageRef.current + 1, true);
   };
 
@@ -410,6 +451,11 @@ export default function CustomersScreen() {
     const validation = validateCustomerInput({ name, phone, email, address, notes });
     if (!validation.success) {
       setFormError(validation.error);
+      return;
+    }
+
+    if (isOffline) {
+      setFormError('No internet connection. Your information is still here. Reconnect and try again.');
       return;
     }
 
@@ -525,14 +571,19 @@ export default function CustomersScreen() {
   // ──────────────────────────────────────────────────────────────────────────
 
   const renderRow = useCallback(
-    ({ item }: ListRenderItemInfo<Customer>) => (
-      <CustomerRow customer={item} onEdit={handleEditCustomer} />
+    ({ item, index }: ListRenderItemInfo<Customer>) => (
+      <AnimatedCustomerRow
+        customer={item}
+        index={index}
+        runKey={listAnimationKey}
+        onEdit={handleEditCustomer}
+      />
     ),
-    [handleEditCustomer],
+    [handleEditCustomer, listAnimationKey],
   );
 
   const countLabel = totalCount === null
-    ? (searching ? 'Searching…' : 'Customers')
+    ? (searching ? 'Searching...' : 'Customers')
     : `${totalCount.toLocaleString()} ${
         search.trim()
           ? (totalCount === 1 ? 'Match' : 'Matches')
@@ -615,21 +666,31 @@ export default function CustomersScreen() {
       </View>
 
       {loading ? (
-        <LoadingState message="Loading customer directory…" />
+        <LoadingState message="Loading customer directory..." />
+      ) : isOffline && customers.length === 0 ? (
+        <OfflineState
+          message="Connect to the internet to load your customers."
+          onRetry={handleRefresh}
+        />
       ) : (
         <FlatList
           style={styles.list}
           data={customers}
           keyExtractor={item => item.id}
           renderItem={renderRow}
-          ListHeaderComponent={loadError && customers.length > 0 ? (
+          ListHeaderComponent={!isOffline && loadError && customers.length > 0 ? (
             <View style={styles.listErrorContainer}>
               <Text style={[styles.inlineErrorText, { color: colors.danger }]}>{loadError}</Text>
               <Button title="Retry" variant="outline" onPress={handleRefresh} style={styles.retryButton} />
             </View>
           ) : null}
           ListEmptyComponent={
-            loadError ? (
+            isOffline ? (
+              <OfflineState
+                message="Connect to the internet to load your customers."
+                onRetry={handleRefresh}
+              />
+            ) : loadError ? (
               <View style={styles.listErrorContainer}>
                 <Text style={[styles.inlineErrorText, { color: colors.danger }]}>
                   {loadError}
@@ -650,7 +711,7 @@ export default function CustomersScreen() {
               </View>
             ) : search.trim() ? (
               <Text style={[styles.noResultsText, { color: colors.textMuted }]}>
-                No customers match &ldquo;{search.trim()}&rdquo;
+                {`No customers match "${search.trim()}"`}
               </Text>
             ) : (
               <View style={styles.emptyWrapper}>
@@ -721,8 +782,9 @@ export default function CustomersScreen() {
                   hitSlop={12}
                   accessibilityRole="button"
                   accessibilityLabel="Close modal"
+                  style={styles.closeButton}
                 >
-                  <Text style={[styles.closeText, { color: colors.textMuted }]}>✕</Text>
+                  <AppIcon name="close-circle-outline" size={22} color={colors.textMuted} />
                 </Pressable>
               </View>
 
@@ -979,6 +1041,12 @@ const styles = StyleSheet.create({
   closeText: {
     fontFamily: typography.fontFamily.heading,
     fontSize: typography.fontSize.lg,
+  },
+  closeButton: {
+    minHeight: 32,
+    minWidth: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   formScrollContent: {
     padding: spacing.sm,

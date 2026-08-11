@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 
+import { AppIcon } from '@/components/ui/app-icon';
 import { brandColors, semanticColors, spacing, typography } from '@/shared/theme';
 
 interface AppHeaderProps {
@@ -51,18 +52,16 @@ export function AppHeader({
                 : undefined
             }
           >
-            <Text
-              style={[
-                styles.backText,
-                backIconOnly && styles.backIconOnlyText,
-                backIconOnly && Platform.OS === 'android' && styles.backIconOnlyTextAndroid,
-                { color: brandColors.lightCopper },
-              ]}
-            >
-              {Platform.OS === 'ios'
-                ? (backIconOnly ? '‹' : '‹ Back')
-                : (backIconOnly ? '←' : '← Back')}
-            </Text>
+            <View style={styles.backContent}>
+              <AppIcon
+                name="chevron-back"
+                size={backIconOnly ? 28 : 22}
+                color={brandColors.lightCopper}
+              />
+              {!backIconOnly ? (
+                <Text style={[styles.backLabel, { color: brandColors.lightCopper }]}>Back</Text>
+              ) : null}
+            </View>
           </Pressable>
         )}
         <View style={styles.titleBlock}>
@@ -76,7 +75,7 @@ export function AppHeader({
           >
             {title}
           </Text>
-          {subtitle && (
+          {subtitle ? (
             <Text
               style={[
                 styles.subtitle,
@@ -87,18 +86,15 @@ export function AppHeader({
             >
               {subtitle}
             </Text>
-          )}
+          ) : null}
         </View>
       </View>
-      {rightAction && <View style={styles.rightContainer}>{rightAction}</View>}
+      {rightAction ? <View style={styles.rightContainer}>{rightAction}</View> : null}
     </View>
   );
 
-  // ── iOS: Liquid Glass header ────────────────────────────────────────────────
   if (Platform.OS === 'ios') {
-    const useLiquidGlass = isLiquidGlassAvailable();
-
-    if (useLiquidGlass) {
+    if (isLiquidGlassAvailable()) {
       return (
         <GlassView
           glassEffectStyle="regular"
@@ -107,9 +103,7 @@ export function AppHeader({
           style={[
             styles.container,
             compact && styles.containerCompact,
-            {
-              borderBottomColor: brandColors.lightCopper,
-            },
+            { borderBottomColor: brandColors.lightCopper },
           ]}
         >
           {inner}
@@ -117,7 +111,6 @@ export function AppHeader({
       );
     }
 
-    // Fallback (Reduce Transparency / older iOS)
     return (
       <View
         style={[
@@ -134,7 +127,6 @@ export function AppHeader({
     );
   }
 
-  // ── Android: solid Material surface with elevation ──────────────────────────
   return (
     <View
       style={[
@@ -190,17 +182,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backText: {
+  backContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  backLabel: {
     fontFamily: typography.fontFamily.bodySemibold,
     fontSize: typography.fontSize.md,
-  },
-  backIconOnlyText: {
-    fontSize: 36,
-    lineHeight: 38,
-  },
-  backIconOnlyTextAndroid: {
-    fontSize: 32,
-    lineHeight: 36,
   },
   title: {
     fontFamily: typography.fontFamily.headingSemibold,
