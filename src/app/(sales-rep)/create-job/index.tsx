@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Text,
   useColorScheme,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Animated, {
@@ -450,6 +451,134 @@ function formatClockTime(value: Date): string {
   return `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`;
 }
 
+function formatPickerDate(value: string): string {
+  const date = parseCalendarDate(value);
+  return date
+    ? date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+    : value;
+}
+
+function formatPickerTime(value: string): string {
+  return parseClockTime(value).toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+type IOSPickerMode = 'date' | 'time';
+
+interface IOSPickerFieldProps {
+  label: string;
+  value: string;
+  mode: IOSPickerMode;
+  onPress: () => void;
+}
+
+function IOSPickerField({ label, value, mode, onPress }: IOSPickerFieldProps) {
+  const colorScheme = useColorScheme();
+  const colors = getColors(colorScheme === 'dark');
+
+  return (
+    <View style={styles.nativePickerField}>
+      <Text style={[styles.nativePickerLabel, { color: colors.text }]}>{label}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${label}, ${value}`}
+        accessibilityHint={`Opens the ${mode} picker`}
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.nativePickerTrigger,
+          {
+            backgroundColor: colors.inputSurface,
+            borderColor: colors.inputBorder,
+            opacity: pressed ? 0.7 : 1,
+          },
+        ]}
+      >
+        <AppIcon
+          name={mode === 'date' ? 'calendar-outline' : 'time-outline'}
+          size={19}
+          color={colors.primary}
+        />
+        <Text style={[styles.nativePickerValue, { color: colors.inputText }]}>{value}</Text>
+        <AppIcon name="chevron-forward" size={17} color={colors.textMuted} />
+      </Pressable>
+    </View>
+  );
+}
+
+interface IOSPickerSheetProps {
+  mode: IOSPickerMode | null;
+  value: Date;
+  minimumDate: Date;
+  onValueChange: (value: Date) => void;
+  onCancel: () => void;
+  onDone: () => void;
+}
+
+function IOSPickerSheet({
+  mode,
+  value,
+  minimumDate,
+  onValueChange,
+  onCancel,
+  onDone,
+}: IOSPickerSheetProps) {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const colors = getColors(isDark);
+  const { width } = useWindowDimensions();
+  const pickerWidth = Math.min(width - spacing.lg * 2, 380);
+
+  return (
+    <Modal
+      visible={mode !== null}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onCancel}
+    >
+      <SafeAreaView
+        edges={['top', 'bottom']}
+        style={[styles.pickerSheet, { backgroundColor: colors.background }]}
+      >
+        <View style={[styles.pickerSheetHeader, { borderBottomColor: colors.border }]}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onCancel}
+            style={({ pressed }) => [styles.pickerSheetButton, pressed && styles.pickerSheetButtonPressed]}
+          >
+            <Text style={[styles.pickerSheetAction, { color: colors.primary }]}>Cancel</Text>
+          </Pressable>
+          <Text style={[styles.pickerSheetTitle, { color: colors.text }]}>
+            {mode === 'date' ? 'Select Date' : 'Select Time'}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onDone}
+            style={({ pressed }) => [styles.pickerSheetButton, pressed && styles.pickerSheetButtonPressed]}
+          >
+            <Text style={[styles.pickerSheetDone, { color: colors.primary }]}>Done</Text>
+          </Pressable>
+        </View>
+        <View style={styles.pickerSheetContent}>
+          {mode ? (
+            <DateTimePicker
+              value={value}
+              mode={mode}
+              display={mode === 'date' ? 'inline' : 'spinner'}
+              style={{ width: pickerWidth }}
+              minimumDate={mode === 'date' ? minimumDate : undefined}
+              accentColor={colors.accent}
+              themeVariant={isDark ? 'dark' : 'light'}
+              onValueChange={(_, date) => onValueChange(date)}
+            />
+          ) : null}
+        </View>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
 type CustomerAvailability = 'loading' | 'available' | 'empty' | 'error';
 
 // ── Main screen ───────────────────────────────────────────────────────────────
@@ -477,6 +606,8 @@ export default function CreatePickupScreen() {
   const [notes,           setNotes]           = useState('');
   const [submitting,      setSubmitting]      = useState(false);
   const [formError,       setFormError]       = useState<string | null>(null);
+  const [activeIOSPicker, setActiveIOSPicker] = useState<IOSPickerMode | null>(null);
+  const [pickerDraft, setPickerDraft] = useState(() => new Date());
   const isSubmittingRef = useRef(false);
   const pickupAttemptRef = useRef<{
     clientRequestId: string;
@@ -485,6 +616,24 @@ export default function CreatePickupScreen() {
   } | null>(null);
   const minimumPickupDate = new Date();
   minimumPickupDate.setHours(0, 0, 0, 0);
+
+  const openIOSPicker = (mode: IOSPickerMode) => {
+    setPickerDraft(
+      mode === 'date'
+        ? (parseCalendarDate(requestedDate) ?? minimumPickupDate)
+        : parseClockTime(requestedTime),
+    );
+    setActiveIOSPicker(mode);
+  };
+
+  const applyIOSPicker = () => {
+    if (activeIOSPicker === 'date') {
+      setRequestedDate(formatLocalCalendarDate(pickerDraft));
+    } else if (activeIOSPicker === 'time') {
+      setRequestedTime(formatClockTime(pickerDraft));
+    }
+    setActiveIOSPicker(null);
+  };
 
   // This bounded one-row check supports the empty state without loading the directory.
   const checkCustomers = useCallback(async () => {
@@ -708,21 +857,12 @@ export default function CreatePickupScreen() {
         <FormCard delay={2 * STAGGER_MS}>
           <View style={styles.fieldBlock}>
             {Platform.OS === 'ios' ? (
-              <View style={styles.nativePickerField}>
-                <Text style={[styles.nativePickerLabel, { color: colors.text }]}>Requested Date *</Text>
-                <View style={styles.nativePickerControl}>
-                  <DateTimePicker
-                    value={parseCalendarDate(requestedDate) ?? minimumPickupDate}
-                    mode="date"
-                    display="compact"
-                    style={styles.nativeDatePicker}
-                    minimumDate={minimumPickupDate}
-                    accentColor={colors.accent}
-                    themeVariant={isDark ? 'dark' : 'light'}
-                    onValueChange={(_, date) => setRequestedDate(formatLocalCalendarDate(date))}
-                  />
-                </View>
-              </View>
+              <IOSPickerField
+                label="Requested Date *"
+                value={formatPickerDate(requestedDate)}
+                mode="date"
+                onPress={() => openIOSPicker('date')}
+              />
             ) : (
               <FormInput
                 label="Requested Date * (YYYY-MM-DD)"
@@ -750,20 +890,12 @@ export default function CreatePickupScreen() {
         <FormCard delay={3 * STAGGER_MS}>
           <View style={styles.fieldBlock}>
             {Platform.OS === 'ios' ? (
-              <View style={styles.nativePickerField}>
-                <Text style={[styles.nativePickerLabel, { color: colors.text }]}>Requested Time (Optional)</Text>
-                <View style={styles.nativePickerControl}>
-                  <DateTimePicker
-                    value={parseClockTime(requestedTime)}
-                    mode="time"
-                    display="compact"
-                    style={styles.nativeTimePicker}
-                    accentColor={colors.accent}
-                    themeVariant={isDark ? 'dark' : 'light'}
-                    onValueChange={(_, date) => setRequestedTime(formatClockTime(date))}
-                  />
-                </View>
-              </View>
+              <IOSPickerField
+                label="Requested Time (Optional)"
+                value={formatPickerTime(requestedTime)}
+                mode="time"
+                onPress={() => openIOSPicker('time')}
+              />
             ) : (
               <FormInput
                 label="Requested Time (Optional)"
@@ -857,6 +989,14 @@ export default function CreatePickupScreen() {
         visible={selectorVisible}
         onClose={() => setSelectorVisible(false)}
         onSelect={handleCustomerSelected}
+      />
+      <IOSPickerSheet
+        mode={activeIOSPicker}
+        value={pickerDraft}
+        minimumDate={minimumPickupDate}
+        onValueChange={setPickerDraft}
+        onCancel={() => setActiveIOSPicker(null)}
+        onDone={applyIOSPicker}
       />
     </ScreenScaffold>
   );
@@ -1053,16 +1193,61 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.bodyMedium,
     letterSpacing: -0.1,
   },
-  nativePickerControl: {
-    minHeight: 36,
-    alignItems: 'flex-start',
+  nativePickerTrigger: {
+    width: '100%',
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  nativePickerValue: {
+    flex: 1,
+    fontFamily: typography.fontFamily.body,
+    fontSize: typography.fontSize.sm,
+    lineHeight: typography.lineHeight.sm,
+  },
+  pickerSheet: {
+    flex: 1,
+  },
+  pickerSheetHeader: {
+    minHeight: 56,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pickerSheetButton: {
+    minWidth: 64,
+    minHeight: 48,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  nativeDatePicker: {
-    width: 180,
+  pickerSheetButtonPressed: {
+    opacity: 0.55,
   },
-  nativeTimePicker: {
-    width: 132,
+  pickerSheetAction: {
+    fontFamily: typography.fontFamily.bodyMedium,
+    fontSize: typography.fontSize.sm,
+  },
+  pickerSheetDone: {
+    fontFamily: typography.fontFamily.bodySemibold,
+    fontSize: typography.fontSize.sm,
+  },
+  pickerSheetTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontFamily: typography.fontFamily.headingSemibold,
+    fontSize: typography.fontSize.md,
+  },
+  pickerSheetContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
   },
 
   submitBtn: {
