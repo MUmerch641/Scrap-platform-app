@@ -32,10 +32,12 @@ export default function DriverProfileScreen() {
   const handleSignOut = () => {
     if (Platform.OS === 'ios') {
       showNativeActionSheet(
-        'Sign Out',
+        'Sign out of ProCopper?',
         ['Sign Out', 'Cancel'],
         1, // cancelButtonIndex
-        () => void doSignOut()
+        () => void doSignOut(),
+        "You'll need to sign in again to access your account.",
+        0
       );
     } else {
       showDialog({

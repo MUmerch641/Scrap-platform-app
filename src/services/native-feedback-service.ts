@@ -98,14 +98,18 @@ export function showNativeActionSheet(
   title: string,
   options: string[],
   cancelButtonIndex: number,
-  onSelect: (index: number) => void
+  onSelect: (index: number) => void,
+  message?: string,
+  destructiveButtonIndex?: number
 ): void {
   if (Platform.OS !== 'ios') return;
   ActionSheetIOS.showActionSheetWithOptions(
     {
       title,
+      message,
       options,
       cancelButtonIndex,
+      destructiveButtonIndex,
     },
     (buttonIndex) => {
       if (buttonIndex !== cancelButtonIndex) {

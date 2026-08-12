@@ -200,7 +200,14 @@ export default function SalesRepProfileScreen() {
   const handleSignOut = () => {
     if (signingOut) return;
     if (Platform.OS === 'ios') {
-      showNativeActionSheet('Sign Out', ['Sign Out', 'Cancel'], 1, () => void doSignOut());
+      showNativeActionSheet(
+        'Sign out of ProCopper?',
+        ['Sign Out', 'Cancel'],
+        1,
+        () => void doSignOut(),
+        "You'll need to sign in again to access your account.",
+        0
+      );
       return;
     }
 
