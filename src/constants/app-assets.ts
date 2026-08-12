@@ -4,7 +4,7 @@
  * available for cached remote content such as future Storage-hosted pickup photos.
  */
 export const APP_IMAGES = {
-  logoLight: require('@/assets/images/procopper logo v1.png'),
-  logoDark: require('@/assets/images/procopper logo v1 - dark bg 1.png'),
-  symbol: require('@/assets/images/procopper - siteicon.png'),
+  logoLight: require('../../assets/images/procopper logo v1.png'),
+  logoDark: require('../../assets/images/procopper logo v1 - dark bg 1.png'),
+  symbol: require('../../assets/images/procopper - siteicon.png'),
 } as const;
