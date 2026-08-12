@@ -710,16 +710,12 @@ export default function CreatePickupScreen() {
             {Platform.OS === 'ios' ? (
               <View style={styles.nativePickerField}>
                 <Text style={[styles.nativePickerLabel, { color: colors.text }]}>Requested Date *</Text>
-                <View
-                  style={[
-                    styles.nativePickerControl,
-                    { backgroundColor: colors.inputSurface, borderColor: colors.inputBorder },
-                  ]}
-                >
+                <View style={styles.nativePickerControl}>
                   <DateTimePicker
                     value={parseCalendarDate(requestedDate) ?? minimumPickupDate}
                     mode="date"
                     display="compact"
+                    style={styles.nativeDatePicker}
                     minimumDate={minimumPickupDate}
                     accentColor={colors.accent}
                     themeVariant={isDark ? 'dark' : 'light'}
@@ -755,17 +751,13 @@ export default function CreatePickupScreen() {
           <View style={styles.fieldBlock}>
             {Platform.OS === 'ios' ? (
               <View style={styles.nativePickerField}>
-                <Text style={[styles.nativePickerLabel, { color: colors.text }]}>Requested Time</Text>
-                <View
-                  style={[
-                    styles.nativePickerControl,
-                    { backgroundColor: colors.inputSurface, borderColor: colors.inputBorder },
-                  ]}
-                >
+                <Text style={[styles.nativePickerLabel, { color: colors.text }]}>Requested Time (Optional)</Text>
+                <View style={styles.nativePickerControl}>
                   <DateTimePicker
                     value={parseClockTime(requestedTime)}
                     mode="time"
                     display="compact"
+                    style={styles.nativeTimePicker}
                     accentColor={colors.accent}
                     themeVariant={isDark ? 'dark' : 'light'}
                     onValueChange={(_, date) => setRequestedTime(formatClockTime(date))}
@@ -1062,12 +1054,15 @@ const styles = StyleSheet.create({
     letterSpacing: -0.1,
   },
   nativePickerControl: {
-    minHeight: 48,
-    borderWidth: 1,
-    borderRadius: radius.lg,
-    paddingHorizontal: spacing.sm,
-    alignItems: 'flex-end',
+    minHeight: 36,
+    alignItems: 'flex-start',
     justifyContent: 'center',
+  },
+  nativeDatePicker: {
+    width: 180,
+  },
+  nativeTimePicker: {
+    width: 132,
   },
 
   submitBtn: {
