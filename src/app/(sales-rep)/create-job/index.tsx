@@ -607,7 +607,11 @@ export default function CreatePickupScreen() {
   // Still checking whether customers exist
   if (customerAvailability === 'loading') {
     return (
-      <ScreenScaffold mode="scroll" header={<AppHeader title="Create Pickup" subtitle="New pickup request" />}>
+      <ScreenScaffold
+        mode="scroll"
+        iosNativeHeader
+        header={<AppHeader title="Create Pickup" subtitle="New pickup request" />}
+      >
         <LoadingState message="Loading customer directory..." />
       </ScreenScaffold>
     );
@@ -615,7 +619,11 @@ export default function CreatePickupScreen() {
 
   if (customerAvailability === 'error') {
     return (
-      <ScreenScaffold mode="scroll" header={<AppHeader title="Create Pickup" subtitle="New pickup request" />}>
+      <ScreenScaffold
+        mode="scroll"
+        iosNativeHeader
+        header={<AppHeader title="Create Pickup" subtitle="New pickup request" />}
+      >
         {isOffline ? (
           <OfflineState
             message="Connect to the internet to load your customers."
@@ -644,7 +652,11 @@ export default function CreatePickupScreen() {
 
   if (customerAvailability === 'empty') {
     return (
-      <ScreenScaffold mode="scroll" header={<AppHeader title="Create Pickup" subtitle="New pickup request" />}>
+      <ScreenScaffold
+        mode="scroll"
+        iosNativeHeader
+        header={<AppHeader title="Create Pickup" subtitle="New pickup request" />}
+      >
         <EmptyState
           title="No customers available"
           message="You must add a customer before creating a pickup request."
@@ -661,6 +673,7 @@ export default function CreatePickupScreen() {
   return (
     <ScreenScaffold
       mode="form"
+      iosNativeHeader
       header={<AppHeader title="Create Pickup" subtitle="New pickup request" />}
     >
       <View style={styles.container}>

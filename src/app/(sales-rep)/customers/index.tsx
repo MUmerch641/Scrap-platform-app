@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { Stack, useFocusEffect } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
 import {
     FlatList,
@@ -611,6 +611,7 @@ export default function CustomersScreen() {
   return (
     <ScreenScaffold
       mode="standard"
+      iosNativeHeader
       contentContainerStyle={styles.screenContent}
       header={
         <AppHeader
@@ -645,6 +646,16 @@ export default function CustomersScreen() {
         />
       }
     >
+      {Platform.OS === 'ios' ? (
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button
+            icon="plus"
+            accessibilityLabel="Add customer"
+            accessibilityHint="Opens the new customer form"
+            onPress={openAddCustomer}
+          />
+        </Stack.Toolbar>
+      ) : null}
       <View style={styles.directoryTools}>
         <SearchField
           value={search}

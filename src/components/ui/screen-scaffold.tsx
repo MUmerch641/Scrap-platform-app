@@ -34,6 +34,9 @@ export interface ScreenScaffoldProps {
   /** Optional header rendered inside the safe area */
   header?: React.ReactNode;
 
+  /** Lets the enclosing iOS Stack own the top header and safe-area inset. */
+  iosNativeHeader?: boolean;
+
   /**
    * Safe-area edges applied to the screen
    *
@@ -63,7 +66,8 @@ export function ScreenScaffold({
   children,
   mode = 'standard',
   header,
-  edges = ['top', 'left', 'right'],
+  iosNativeHeader = false,
+  edges,
   avoidFloatingTabBar = true,
   style,
   contentContainerStyle,
@@ -76,6 +80,9 @@ export function ScreenScaffold({
 
   const isForm = mode === 'form';
   const isScrollable = mode === 'form' || mode === 'scroll';
+  const usesIOSNativeHeader = Platform.OS === 'ios' && iosNativeHeader;
+  const resolvedEdges = edges ?? (usesIOSNativeHeader ? ['left', 'right'] : ['top', 'left', 'right']);
+  const resolvedHeader = usesIOSNativeHeader ? null : header;
 
   const extraBottomPadding =
     Platform.OS === 'ios' && avoidFloatingTabBar
@@ -119,9 +126,9 @@ export function ScreenScaffold({
     return (
       <SafeAreaView
         style={containerStyle}
-        edges={edges}
+        edges={resolvedEdges}
       >
-        {header}
+        {resolvedHeader}
 
         {isForm ? (
           <KeyboardAvoidingView
@@ -146,9 +153,9 @@ export function ScreenScaffold({
   return (
     <SafeAreaView
       style={containerStyle}
-      edges={edges}
+      edges={resolvedEdges}
     >
-      {header}
+      {resolvedHeader}
 
       <View
         style={[
