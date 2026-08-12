@@ -32,6 +32,12 @@ export function AppHeader({
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const colors = semanticColors[isDark ? 'dark' : 'light'];
+  const iosDividerColor = isDark
+    ? 'rgba(230, 164, 107, 0.22)'
+    : 'rgba(230, 164, 107, 0.30)';
+  const iosSubtitleColor = isDark
+    ? 'rgba(251, 252, 248, 0.74)'
+    : 'rgba(251, 252, 248, 0.82)';
 
   const inner = (
     <View style={[styles.innerRow, compact && styles.innerRowCompact]}>
@@ -64,10 +70,11 @@ export function AppHeader({
             </View>
           </Pressable>
         )}
-        <View style={styles.titleBlock}>
+        <View style={[styles.titleBlock, Platform.OS === 'ios' && styles.titleBlockIOS]}>
           <Text
             style={[
               styles.title,
+              Platform.OS === 'ios' && styles.titleIOS,
               compact && styles.titleCompact,
               { color: brandColors.white },
             ]}
@@ -79,8 +86,9 @@ export function AppHeader({
             <Text
               style={[
                 styles.subtitle,
+                Platform.OS === 'ios' && styles.subtitleIOS,
                 compact && styles.subtitleCompact,
-                { color: brandColors.offWhite },
+                { color: Platform.OS === 'ios' ? iosSubtitleColor : brandColors.offWhite },
               ]}
               numberOfLines={1}
             >
@@ -103,7 +111,7 @@ export function AppHeader({
           style={[
             styles.container,
             compact && styles.containerCompact,
-            { borderBottomColor: brandColors.lightCopper },
+            { borderBottomColor: iosDividerColor },
           ]}
         >
           {inner}
@@ -118,7 +126,7 @@ export function AppHeader({
           compact && styles.containerCompact,
           {
             backgroundColor: brandColors.navy,
-            borderBottomColor: brandColors.lightCopper,
+            borderBottomColor: iosDividerColor,
           },
         ]}
       >
@@ -175,6 +183,9 @@ const styles = StyleSheet.create({
   titleBlock: {
     flex: 1,
   },
+  titleBlockIOS: {
+    gap: 1,
+  },
   backButton: {
     minWidth: 44,
     paddingRight: spacing.xs,
@@ -195,6 +206,11 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.headingSemibold,
     fontSize: typography.fontSize.md,
   },
+  titleIOS: {
+    fontFamily: typography.fontFamily.heading,
+    fontSize: 17,
+    lineHeight: 20,
+  },
   titleCompact: {
     fontSize: typography.fontSize.md,
     lineHeight: typography.lineHeight.sm,
@@ -202,6 +218,11 @@ const styles = StyleSheet.create({
   subtitle: {
     fontFamily: typography.fontFamily.body,
     fontSize: typography.fontSize.xs,
+  },
+  subtitleIOS: {
+    fontSize: typography.fontSize.xs,
+    lineHeight: 15,
+    letterSpacing: 0.1,
   },
   subtitleCompact: {
     fontSize: 11,
