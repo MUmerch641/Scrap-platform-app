@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, Text, useColorScheme, View, ViewStyle } from 'react-native';
-import { Image } from 'expo-image';
+import { Image, StyleSheet, Text, useColorScheme, View, ViewStyle } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -12,6 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { semanticColors, spacing, typography } from '@/shared/theme';
+import { APP_IMAGES } from '@/constants/app-assets';
 
 export const CONTENT_LOADER_SIZE = 56;
 export const BUTTON_LOADER_SIZE = 24;
@@ -81,9 +81,9 @@ export function BrandSpinner({
         ]}
       >
         <Image
-          source={require('@/assets/images/procopper - siteicon.png')}
-          style={styles.spinnerImage}
-          contentFit="contain"
+          source={APP_IMAGES.symbol}
+          style={{ width: artworkSize, height: artworkSize }}
+          resizeMode="contain"
           accessibilityElementsHidden
         />
       </Animated.View>
@@ -114,10 +114,6 @@ const styles = StyleSheet.create({
   },
   spinnerArtwork: {
     position: 'absolute',
-  },
-  spinnerImage: {
-    width: '100%',
-    height: '100%',
   },
   container: {
     flex: 1,

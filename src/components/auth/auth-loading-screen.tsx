@@ -1,11 +1,11 @@
 import React, { useEffect } from 'react';
 import {
   AccessibilityInfo,
+  Image,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import Reanimated, {
   cancelAnimation,
@@ -19,6 +19,7 @@ import Reanimated, {
 } from 'react-native-reanimated';
 
 import { brandColors, typography } from '@/shared/theme';
+import { APP_IMAGES } from '@/constants/app-assets';
 
 /**
  * Brand Lockup Reveal (Startup Animation)
@@ -136,9 +137,9 @@ export function AuthLoadingScreen() {
         {/* Transparent recycling symbol mark */}
         <Reanimated.View style={symbolStyle}>
           <Image
-            source={require('@/assets/images/procopper - siteicon.png')}
+            source={APP_IMAGES.symbol}
             style={styles.mark}
-            contentFit="contain"
+            resizeMode="contain"
             accessibilityLabel="ProCopper Recycling Symbol"
           />
         </Reanimated.View>
