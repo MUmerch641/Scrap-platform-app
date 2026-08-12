@@ -1,10 +1,13 @@
 import React, {
   forwardRef,
+  useId,
   useImperativeHandle,
   useRef,
   useState,
 } from 'react';
 import {
+  InputAccessoryView,
+  Keyboard,
   Platform,
   Pressable,
   StyleSheet,
@@ -27,6 +30,7 @@ export interface FormInputProps extends RNTextInputProps {
   label: string;
   error?: string;
   isPassword?: boolean;
+  showDoneAccessory?: boolean;
 }
 
 export const FormInput = forwardRef<RNTextInput, FormInputProps>(
@@ -35,11 +39,13 @@ export const FormInput = forwardRef<RNTextInput, FormInputProps>(
       label,
       error,
       isPassword = false,
+      showDoneAccessory = false,
       style,
       onFocus,
       onBlur,
       secureTextEntry,
       selectionColor,
+      inputAccessoryViewID,
       ...props
     },
     ref
@@ -53,6 +59,9 @@ export const FormInput = forwardRef<RNTextInput, FormInputProps>(
     const [isFocused, setIsFocused] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const inputRef = useRef<RNTextInput>(null);
+    const generatedAccessoryId = `form-input-${useId().replace(/:/g, '')}`;
+    const resolvedAccessoryId = inputAccessoryViewID
+      ?? (Platform.OS === 'ios' && showDoneAccessory ? generatedAccessoryId : undefined);
 
     useImperativeHandle(ref, () => inputRef.current as RNTextInput);
 
@@ -121,6 +130,7 @@ export const FormInput = forwardRef<RNTextInput, FormInputProps>(
             selectionColor={
               selectionColor ?? colors.inputBorderFocused
             }
+            inputAccessoryViewID={resolvedAccessoryId}
             secureTextEntry={
               isPassword ? !showPassword : secureTextEntry
             }
@@ -160,6 +170,27 @@ export const FormInput = forwardRef<RNTextInput, FormInputProps>(
             </Pressable>
           ) : null}
         </View>
+
+        {Platform.OS === 'ios' && showDoneAccessory && resolvedAccessoryId ? (
+          <InputAccessoryView nativeID={resolvedAccessoryId}>
+            <View
+              style={[
+                styles.accessoryBar,
+                { backgroundColor: colors.modalSurface, borderTopColor: colors.border },
+              ]}
+            >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Done editing"
+                hitSlop={8}
+                onPress={Keyboard.dismiss}
+                style={({ pressed }) => [styles.doneButton, pressed && styles.doneButtonPressed]}
+              >
+                <Text style={[styles.doneText, { color: colors.primary }]}>Done</Text>
+              </Pressable>
+            </View>
+          </InputAccessoryView>
+        ) : null}
 
         {error ? (
           <Text
@@ -244,5 +275,25 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.xs,
     lineHeight: typography.lineHeight.xs,
     fontFamily: typography.fontFamily.body,
+  },
+  accessoryBar: {
+    minHeight: 44,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  doneButton: {
+    minWidth: 52,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  doneButtonPressed: {
+    opacity: 0.55,
+  },
+  doneText: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.bodySemibold,
   },
 });

@@ -10,6 +10,7 @@ import {
 import Animated, {
     Easing,
     useAnimatedStyle,
+    useReducedMotion,
     useSharedValue,
     withDelay,
     withSpring,
@@ -62,16 +63,21 @@ interface FadeSlideProps {
 }
 
 function FadeSlide({ children, delay }: FadeSlideProps) {
+  const reduceMotion = useReducedMotion();
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(12);
 
   React.useEffect(() => {
+    if (reduceMotion) {
+      opacity.value = 1;
+      translateY.value = 0;
+      return;
+    }
     const cfg = { duration: DURATION_MS, easing: EASE };
     opacity.value    = withDelay(delay, withTiming(1, cfg));
     translateY.value = withDelay(delay, withTiming(0, cfg));
   // shared values are stable refs — no deps needed
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [delay, opacity, reduceMotion, translateY]);
 
   const style = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -92,15 +98,20 @@ interface MetricCardProps {
 function MetricCard({ label, count, delay }: MetricCardProps) {
   const colorScheme = useColorScheme();
   const colors = semanticColors[colorScheme === 'dark' ? 'dark' : 'light'];
+  const reduceMotion = useReducedMotion();
 
   const opacity = useSharedValue(0);
   const scale   = useSharedValue(0.94);
 
   React.useEffect(() => {
+    if (reduceMotion) {
+      opacity.value = 1;
+      scale.value = 1;
+      return;
+    }
     opacity.value = withDelay(delay, withTiming(1, { duration: DURATION_MS, easing: EASE }));
     scale.value   = withDelay(delay, withSpring(1, { mass: 0.5, stiffness: 240, damping: 20 }));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [delay, opacity, reduceMotion, scale]);
 
   const animStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,

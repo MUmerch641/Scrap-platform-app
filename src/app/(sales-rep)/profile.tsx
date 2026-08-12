@@ -4,6 +4,7 @@ import { Platform, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withDelay,
   withSpring,
@@ -62,16 +63,22 @@ interface FadeSlideProps {
 }
 
 function FadeSlide({ children, delay, run }: FadeSlideProps) {
+  const reduceMotion = useReducedMotion();
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(12);
 
   React.useEffect(() => {
     if (!run) return;
+    if (reduceMotion) {
+      opacity.value = 1;
+      translateY.value = 0;
+      return;
+    }
     opacity.value = 0;
     translateY.value = 12;
     opacity.value = withDelay(delay, withTiming(1, { duration: DURATION, easing: EASE }));
     translateY.value = withDelay(delay, withTiming(0, { duration: DURATION, easing: EASE }));
-  }, [run, delay, opacity, translateY]);
+  }, [run, delay, opacity, reduceMotion, translateY]);
 
   const style = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -88,16 +95,22 @@ interface ScaleInProps {
 }
 
 function ScaleIn({ children, delay, run }: ScaleInProps) {
+  const reduceMotion = useReducedMotion();
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.82);
 
   React.useEffect(() => {
     if (!run) return;
+    if (reduceMotion) {
+      opacity.value = 1;
+      scale.value = 1;
+      return;
+    }
     opacity.value = 0;
     scale.value = 0.82;
     opacity.value = withDelay(delay, withTiming(1, { duration: DURATION, easing: EASE }));
     scale.value = withDelay(delay, withSpring(1, { mass: 0.5, stiffness: 220, damping: 18 }));
-  }, [run, delay, opacity, scale]);
+  }, [run, delay, opacity, reduceMotion, scale]);
 
   const style = useAnimatedStyle(() => ({
     opacity: opacity.value,

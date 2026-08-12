@@ -1,4 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
+import { DateTimePicker } from '@expo/ui/community/datetime-picker';
 import React, { useCallback, useRef, useState } from 'react';
 import {
   FlatList,
@@ -14,6 +15,7 @@ import {
 import Animated, {
   Easing,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withDelay,
   withSpring,
@@ -66,13 +68,19 @@ const EASE        = Easing.out(Easing.cubic);
 // ── Animation helpers ─────────────────────────────────────────────────────────
 interface FadeSlideProps { children: React.ReactNode; delay: number; }
 function FadeSlide({ children, delay }: FadeSlideProps) {
+  const reduceMotion = useReducedMotion();
   const opacity    = useSharedValue(0);
   const translateY = useSharedValue(0);
   React.useEffect(() => {
+    if (reduceMotion) {
+      opacity.value = 1;
+      translateY.value = 12;
+      return;
+    }
     const cfg = { duration: DURATION_MS, easing: EASE };
     opacity.value    = withDelay(delay, withTiming(1, cfg));
     translateY.value = withDelay(delay, withTiming(12, cfg));
-  }, [delay, opacity, translateY]);
+  }, [delay, opacity, reduceMotion, translateY]);
   const style = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ translateY: 12 - translateY.value }],
@@ -82,12 +90,18 @@ function FadeSlide({ children, delay }: FadeSlideProps) {
 
 interface FormCardProps { children: React.ReactNode; delay: number; }
 function FormCard({ children, delay }: FormCardProps) {
+  const reduceMotion = useReducedMotion();
   const opacity = useSharedValue(0);
   const scale   = useSharedValue(0.96);
   React.useEffect(() => {
+    if (reduceMotion) {
+      opacity.value = 1;
+      scale.value = 1;
+      return;
+    }
     opacity.value = withDelay(delay, withTiming(1, { duration: DURATION_MS, easing: EASE }));
     scale.value   = withDelay(delay, withSpring(1, { mass: 0.5, stiffness: 230, damping: 20 }));
-  }, [delay, opacity, scale]);
+  }, [delay, opacity, reduceMotion, scale]);
   const style = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ scale: scale.value }],
@@ -410,6 +424,32 @@ function getTomorrowString(): string {
   return formatLocalCalendarDate(tomorrow);
 }
 
+function parseCalendarDate(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day, 12);
+  return date.getFullYear() === year
+    && date.getMonth() === month - 1
+    && date.getDate() === day
+    ? date
+    : null;
+}
+
+function parseClockTime(value: string): Date {
+  const match = /^(\d{2}):(\d{2})$/.exec(value);
+  const date = new Date();
+  date.setSeconds(0, 0);
+  date.setHours(match ? Number(match[1]) : 9, match ? Number(match[2]) : 0);
+  return date;
+}
+
+function formatClockTime(value: Date): string {
+  return `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`;
+}
+
 type CustomerAvailability = 'loading' | 'available' | 'empty' | 'error';
 
 // ── Main screen ───────────────────────────────────────────────────────────────
@@ -443,6 +483,8 @@ export default function CreatePickupScreen() {
     fingerprint: string;
     attempted: boolean;
   } | null>(null);
+  const minimumPickupDate = new Date();
+  minimumPickupDate.setHours(0, 0, 0, 0);
 
   // This bounded one-row check supports the empty state without loading the directory.
   const checkCustomers = useCallback(async () => {
@@ -652,12 +694,34 @@ export default function CreatePickupScreen() {
         {/* Requested Date */}
         <FormCard delay={2 * STAGGER_MS}>
           <View style={styles.fieldBlock}>
-            <FormInput
-              label="Requested Date * (YYYY-MM-DD)"
-              value={requestedDate}
-              onChangeText={setRequestedDate}
-              placeholder="YYYY-MM-DD"
-            />
+            {Platform.OS === 'ios' ? (
+              <View style={styles.nativePickerField}>
+                <Text style={[styles.nativePickerLabel, { color: colors.text }]}>Requested Date *</Text>
+                <View
+                  style={[
+                    styles.nativePickerControl,
+                    { backgroundColor: colors.inputSurface, borderColor: colors.inputBorder },
+                  ]}
+                >
+                  <DateTimePicker
+                    value={parseCalendarDate(requestedDate) ?? minimumPickupDate}
+                    mode="date"
+                    display="compact"
+                    minimumDate={minimumPickupDate}
+                    accentColor={colors.accent}
+                    themeVariant={isDark ? 'dark' : 'light'}
+                    onValueChange={(_, date) => setRequestedDate(formatLocalCalendarDate(date))}
+                  />
+                </View>
+              </View>
+            ) : (
+              <FormInput
+                label="Requested Date * (YYYY-MM-DD)"
+                value={requestedDate}
+                onChangeText={setRequestedDate}
+                placeholder="YYYY-MM-DD"
+              />
+            )}
             <View style={styles.presetRow}>
               <Pressable onPress={() => setRequestedDate(getTodayString())}
                 hitSlop={10}
@@ -676,12 +740,33 @@ export default function CreatePickupScreen() {
         {/* Requested Time */}
         <FormCard delay={3 * STAGGER_MS}>
           <View style={styles.fieldBlock}>
-            <FormInput
-              label="Requested Time (Optional)"
-              value={requestedTime}
-              onChangeText={setRequestedTime}
-              placeholder="e.g. 09:00 or 14:00"
-            />
+            {Platform.OS === 'ios' ? (
+              <View style={styles.nativePickerField}>
+                <Text style={[styles.nativePickerLabel, { color: colors.text }]}>Requested Time</Text>
+                <View
+                  style={[
+                    styles.nativePickerControl,
+                    { backgroundColor: colors.inputSurface, borderColor: colors.inputBorder },
+                  ]}
+                >
+                  <DateTimePicker
+                    value={parseClockTime(requestedTime)}
+                    mode="time"
+                    display="compact"
+                    accentColor={colors.accent}
+                    themeVariant={isDark ? 'dark' : 'light'}
+                    onValueChange={(_, date) => setRequestedTime(formatClockTime(date))}
+                  />
+                </View>
+              </View>
+            ) : (
+              <FormInput
+                label="Requested Time (Optional)"
+                value={requestedTime}
+                onChangeText={setRequestedTime}
+                placeholder="e.g. 09:00 or 14:00"
+              />
+            )}
             <View style={styles.presetRow}>
               {['09:00', '11:00', '14:00', '16:00'].map((t) => (
                 <Pressable key={t} onPress={() => setRequestedTime(t)}
@@ -732,6 +817,7 @@ export default function CreatePickupScreen() {
             value={estimatedWeight}
             onChangeText={setEstimatedWeight}
             keyboardType="decimal-pad"
+            showDoneAccessory
             placeholder="e.g. 500"
           />
         </FormCard>
@@ -950,6 +1036,25 @@ const styles = StyleSheet.create({
   presetText: {
     fontFamily: typography.fontFamily.bodyMedium,
     fontSize: typography.fontSize.xs,
+  },
+  nativePickerField: {
+    width: '100%',
+    marginBottom: spacing.sm,
+    gap: 6,
+  },
+  nativePickerLabel: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: typography.fontFamily.bodyMedium,
+    letterSpacing: -0.1,
+  },
+  nativePickerControl: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.sm,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
 
   submitBtn: {

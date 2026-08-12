@@ -18,6 +18,7 @@ import { AppDialogProvider } from '@/context/AppDialogContext';
 import { NetworkStatusProvider } from '@/context/NetworkStatusContext';
 import { AuthGate } from '@/components/auth/auth-gate';
 import { OfflineBanner } from '@/components/ui/offline-banner';
+import { IOSFeedbackToast } from '@/components/ui/ios-feedback-toast';
 import { semanticColors } from '@/shared/theme';
 
 void SplashScreen.preventAutoHideAsync();
@@ -82,6 +83,7 @@ export default function Layout() {
               <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }} />
             </AuthGate>
             <OfflineBanner />
+            <IOSFeedbackToast />
           </NetworkStatusProvider>
         </AppDialogProvider>
       </ThemeProvider>

@@ -2,6 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { ActionSheetIOS, Alert, Platform, ToastAndroid } from 'react-native';
 
 import { showAndroidErrorDialog } from '@/services/app-dialog-controller';
+import { showIOSFeedback } from '@/services/ios-feedback-controller';
 
 export type NegativeHapticType = 'error' | 'warning';
 
@@ -29,6 +30,10 @@ export async function triggerNegativeHaptic(type: NegativeHapticType = 'error'):
  * Android uses standard ToastAndroid.show().
  */
 export function showSuccessMessage(message: string): void {
+  if (Platform.OS === 'ios') {
+    showIOSFeedback({ message, kind: 'success' });
+    return;
+  }
   if (Platform.OS === 'android') {
     ToastAndroid.show(message, ToastAndroid.SHORT);
   }
@@ -39,6 +44,10 @@ export function showSuccessMessage(message: string): void {
  * Android uses standard ToastAndroid.show().
  */
 export function showInfoMessage(message: string): void {
+  if (Platform.OS === 'ios') {
+    showIOSFeedback({ message, kind: 'info' });
+    return;
+  }
   if (Platform.OS === 'android') {
     ToastAndroid.show(message, ToastAndroid.SHORT);
   }
