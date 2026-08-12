@@ -758,7 +758,6 @@ export default function CreatePickupScreen() {
     return (
       <ScreenScaffold
         mode="scroll"
-        iosNativeHeader
         header={<AppHeader title="Create Pickup" subtitle="New pickup request" />}
       >
         <LoadingState message="Loading customer directory..." />
@@ -770,7 +769,6 @@ export default function CreatePickupScreen() {
     return (
       <ScreenScaffold
         mode="scroll"
-        iosNativeHeader
         header={<AppHeader title="Create Pickup" subtitle="New pickup request" />}
       >
         {isOffline ? (
@@ -803,7 +801,6 @@ export default function CreatePickupScreen() {
     return (
       <ScreenScaffold
         mode="scroll"
-        iosNativeHeader
         header={<AppHeader title="Create Pickup" subtitle="New pickup request" />}
       >
         <EmptyState
@@ -822,7 +819,6 @@ export default function CreatePickupScreen() {
   return (
     <ScreenScaffold
       mode="form"
-      iosNativeHeader
       header={<AppHeader title="Create Pickup" subtitle="New pickup request" />}
     >
       <View style={styles.container}>

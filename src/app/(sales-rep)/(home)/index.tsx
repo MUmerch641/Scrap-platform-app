@@ -205,7 +205,6 @@ export default function SalesRepHomeScreen() {
   return (
     <ScreenScaffold
       mode="scroll"
-      iosNativeHeader
       header={<AppHeader title="Home" subtitle="Sales workspace" />}
     >
       <View style={styles.container}>

@@ -239,7 +239,6 @@ export default function SalesRepProfileScreen() {
   return (
     <ScreenScaffold
       mode="scroll"
-      iosNativeHeader
       header={<AppHeader title="Profile" subtitle="Account and preferences" />}
     >
       <View style={styles.container}>
