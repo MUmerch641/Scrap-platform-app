@@ -7,6 +7,7 @@ export default function SalesRepHomeStackLayout() {
       initialRouteName="index"
       screenOptions={{
         headerShown: false,
+        headerBackButtonDisplayMode: Platform.OS === 'ios' ? 'minimal' : 'default',
       }}
     >
       <Stack.Screen name="index" />
