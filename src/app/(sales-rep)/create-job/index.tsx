@@ -1,5 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { DateTimePicker } from '@expo/ui/community/datetime-picker';
+import { BottomSheet, BottomSheetView } from '@expo/ui/community/bottom-sheet';
 import React, { useCallback, useRef, useState } from 'react';
 import {
   FlatList,
@@ -529,18 +530,17 @@ function IOSPickerSheet({
   const colors = getColors(isDark);
   const { width } = useWindowDimensions();
   const pickerWidth = Math.min(width - spacing.lg * 2, 380);
+  const sheetHeight = mode === 'date' ? 470 : 340;
 
   return (
-    <Modal
-      visible={mode !== null}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onCancel}
+    <BottomSheet
+      index={mode === null ? -1 : 0}
+      snapPoints={[sheetHeight]}
+      enablePanDownToClose
+      onClose={onCancel}
+      backgroundStyle={{ backgroundColor: colors.background }}
     >
-      <SafeAreaView
-        edges={['top', 'bottom']}
-        style={[styles.pickerSheet, { backgroundColor: colors.background }]}
-      >
+      <BottomSheetView style={styles.pickerSheet}>
         <View style={[styles.pickerSheetHeader, { borderBottomColor: colors.border }]}>
           <Pressable
             accessibilityRole="button"
@@ -574,8 +574,8 @@ function IOSPickerSheet({
             />
           ) : null}
         </View>
-      </SafeAreaView>
-    </Modal>
+      </BottomSheetView>
+    </BottomSheet>
   );
 }
 
