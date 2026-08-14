@@ -76,11 +76,11 @@ function ProfileRow({ icon, label, value, colors }: { icon: 'person-outline' | '
 
 const styles = StyleSheet.create({
   content: { gap: spacing.lg, paddingTop: spacing.md },
-  identityHero: { marginHorizontal: -spacing.md, marginTop: -spacing.md, minHeight: 166, flexDirection: 'row', alignItems: 'center', gap: spacing.lg, padding: spacing.lg, backgroundColor: brandColors.navy, borderBottomLeftRadius: radius.xl, borderBottomRightRadius: radius.xl },
-  avatar: { width: 82, height: 82, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(230,164,107,0.16)', borderWidth: 2, borderColor: brandColors.lightCopper },
-  initials: { color: brandColors.white, fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize['2xl'] },
-  identityCopy: { flex: 1, gap: spacing.sm },
-  name: { color: brandColors.white, fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.xl, lineHeight: typography.lineHeight.xl },
+  identityHero: { minHeight: 108, flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, backgroundColor: brandColors.navy, borderRadius: radius.lg },
+  avatar: { width: 58, height: 58, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(230,164,107,0.12)', borderWidth: 1, borderColor: brandColors.lightCopper },
+  initials: { color: brandColors.white, fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.xl },
+  identityCopy: { flex: 1, gap: spacing.xs },
+  name: { color: brandColors.white, fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg, lineHeight: typography.lineHeight.lg },
   rolePill: { alignSelf: 'flex-start', minHeight: 28, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.full, paddingHorizontal: spacing.sm, backgroundColor: 'rgba(251,252,248,0.10)' },
   roleText: { color: brandColors.lightCopper, fontFamily: typography.fontFamily.bodyBold, fontSize: 9, letterSpacing: 0.8 },
   eyebrow: { fontFamily: typography.fontFamily.bodyBold, fontSize: 10, letterSpacing: 1 },

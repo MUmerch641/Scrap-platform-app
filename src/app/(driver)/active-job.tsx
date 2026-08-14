@@ -310,13 +310,6 @@ export default function DriverActiveJobScreen() {
         <Text style={styles.customerName}>{job.customerName}</Text>
         <View style={styles.heroDetail}><Ionicons name="time-outline" size={17} color={brandColors.lightCopper} /><Text style={styles.heroDetailText}>{schedule.time} · {schedule.date}</Text></View>
         <View style={styles.heroDetail}><Ionicons name="location-outline" size={17} color={brandColors.lightCopper} /><Text style={styles.heroDetailText} numberOfLines={2}>{job.pickupAddress}</Text></View>
-        <View style={styles.heroMetaRow}>
-          <HeroMeta label="Material" value={job.materialType} />
-          <View style={styles.heroMetaDivider} />
-          <HeroMeta label="Est. weight" value={formatDriverWeight(job.estimatedWeight)} />
-          <View style={styles.heroMetaDivider} />
-          <HeroMeta label="Vehicle" value={job.assignment.vehicle.label} />
-        </View>
       </View>
 
       <DriverJobProgress status={job.executionStatus} />
@@ -391,23 +384,17 @@ export default function DriverActiveJobScreen() {
 }
 
 function nextStepDescription(status: DriverJob['executionStatus']): string { if (status === 'assigned') return 'Review the pickup and begin driving when ready.'; if (status === 'en_route') return 'Mark your arrival once you are safely at the pickup.'; if (status === 'arrived') return 'Add evidence and record the collected material.'; return 'Complete delivery after reaching the yard.'; }
-function HeroMeta({ label, value }: { label: string; value: string }) { return <View style={styles.heroMeta}><Text style={styles.heroMetaLabel}>{label}</Text><Text style={styles.heroMetaValue} numberOfLines={1}>{value}</Text></View>; }
 function OperationalSection({ title, subtitle, icon, colors, children }: { title: string; subtitle: string; icon: React.ComponentProps<typeof Ionicons>['name']; colors: (typeof semanticColors)[keyof typeof semanticColors]; children: React.ReactNode }) { return <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={styles.sectionHeading}><Ionicons name={icon} size={20} color={colors.accent} /><View style={styles.sectionHeadingCopy}><Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>{subtitle}</Text></View></View>{children}</View>; }
 function InfoItem({ icon, label, value, colors }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; value: string; colors: (typeof semanticColors)[keyof typeof semanticColors] }) { return <View style={styles.infoItem}><Ionicons name={icon} size={17} color={colors.accent} /><View style={styles.infoCopy}><Text style={[styles.infoLabel, { color: colors.textMuted }]}>{label}</Text><Text style={[styles.infoValue, { color: colors.text }]}>{value}</Text></View></View>; }
 function StageHeading({ title, subtitle, colors }: { title: string; subtitle: string; colors: (typeof semanticColors)[keyof typeof semanticColors] }) { return <View style={styles.stageHeading}><Text style={[styles.stageTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.stageSubtitle, { color: colors.textMuted }]}>{subtitle}</Text></View>; }
 const styles = StyleSheet.create({
   content: { gap: spacing.md, paddingTop: spacing.md },
-  overviewHero: { marginHorizontal: -spacing.md, marginTop: -spacing.md, padding: spacing.lg, gap: spacing.sm, backgroundColor: brandColors.navy, borderBottomLeftRadius: radius.xl, borderBottomRightRadius: radius.xl },
+  overviewHero: { padding: spacing.md, gap: spacing.sm, backgroundColor: brandColors.navy, borderRadius: radius.lg },
   overviewTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   overviewEyebrow: { color: brandColors.lightCopper, fontFamily: typography.fontFamily.bodyBold, fontSize: 10, letterSpacing: 1.2 },
-  customerName: { color: brandColors.white, fontFamily: typography.fontFamily.headingSemibold, fontSize: 28, lineHeight: 32 },
+  customerName: { color: brandColors.white, fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.xl, lineHeight: typography.lineHeight.xl },
   heroDetail: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   heroDetailText: { flex: 1, color: 'rgba(251,252,248,0.84)', fontFamily: typography.fontFamily.bodyMedium, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm },
-  heroMetaRow: { minHeight: 60, flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: radius.lg, backgroundColor: 'rgba(251,252,248,0.09)' },
-  heroMeta: { flex: 1, gap: 3 },
-  heroMetaLabel: { color: 'rgba(251,252,248,0.60)', fontFamily: typography.fontFamily.bodyMedium, fontSize: 9 },
-  heroMetaValue: { color: brandColors.white, fontFamily: typography.fontFamily.bodyBold, fontSize: 11 },
-  heroMetaDivider: { width: StyleSheet.hairlineWidth, height: 30, marginHorizontal: spacing.sm, backgroundColor: 'rgba(251,252,248,0.18)' },
   nextStepBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingHorizontal: spacing.xs },
   nextStepLabel: { width: 66, fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.xs },
   nextStepCopy: { flex: 1, gap: 2 },

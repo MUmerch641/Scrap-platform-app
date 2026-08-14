@@ -67,12 +67,9 @@ export default function DriverHomeScreen() {
   return (
     <ScreenScaffold mode="scroll" header={<AppHeader title="Home" subtitle="Driver operations" />} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
-        <View style={styles.heroTop}>
-          <View style={styles.heroCopy}>
-            <Text style={styles.greeting}>{getGreeting()}, {firstName}</Text>
-            <Text style={styles.heroTitle}>{activeJob ? 'You have a job in progress' : nextJob ? 'Your next pickup is ready' : 'Your shift is clear'}</Text>
-          </View>
-          <View style={styles.driverIcon}><Ionicons name="car-sport" size={24} color={brandColors.lightCopper} /></View>
+        <View style={styles.heroCopy}>
+          <Text style={[styles.greeting, { color: colors.textMuted }]}>{getGreeting()}, {firstName}</Text>
+          <Text style={[styles.heroTitle, { color: colors.text }]}>{activeJob ? 'Job in progress' : nextJob ? 'Next pickup' : 'Shift overview'}</Text>
         </View>
         <View style={styles.shiftSummary}>
           <ShiftMetric value={String(counts.today)} label="Jobs today" />
@@ -166,13 +163,11 @@ function CompactNextJob({ job, onPress, colors }: { job: DriverJob; onPress: () 
 
 const styles = StyleSheet.create({
   content: { gap: spacing.lg, paddingTop: spacing.md },
-  hero: { marginHorizontal: -spacing.md, marginTop: -spacing.md, padding: spacing.lg, gap: spacing.lg, backgroundColor: brandColors.navy, borderBottomLeftRadius: radius.xl, borderBottomRightRadius: radius.xl },
-  heroTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  hero: { gap: spacing.sm },
   heroCopy: { flex: 1, gap: spacing.xs },
-  greeting: { color: 'rgba(251,252,248,0.76)', fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.sm },
-  heroTitle: { color: brandColors.white, fontFamily: typography.fontFamily.headingSemibold, fontSize: 27, lineHeight: 31 },
-  driverIcon: { width: 48, height: 48, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(230,164,107,0.14)', borderWidth: 1, borderColor: 'rgba(230,164,107,0.30)' },
-  shiftSummary: { minHeight: 70, flexDirection: 'row', alignItems: 'center', borderRadius: radius.lg, paddingHorizontal: spacing.md, backgroundColor: 'rgba(251,252,248,0.09)' },
+  greeting: { fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.sm },
+  heroTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.xl, lineHeight: typography.lineHeight.xl },
+  shiftSummary: { minHeight: 62, flexDirection: 'row', alignItems: 'center', borderRadius: radius.lg, paddingHorizontal: spacing.md, backgroundColor: brandColors.navy },
   shiftMetric: { flex: 1, gap: 2 },
   shiftValue: { color: brandColors.white, fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.xl },
   shiftLabel: { color: 'rgba(251,252,248,0.68)', fontFamily: typography.fontFamily.bodyMedium, fontSize: 10 },
