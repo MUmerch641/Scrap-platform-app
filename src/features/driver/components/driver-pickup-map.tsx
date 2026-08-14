@@ -203,7 +203,7 @@ export function DriverPickupMap({
     routeRefreshOnForegroundRef.current = false;
     routeRequestRef.current += 1;
     routeInFlightRef.current = null;
-  }, [pickupCoordinate?.latitude, pickupCoordinate?.longitude, pickupJobId]);
+  }, [pickupAddress, pickupJobId]);
 
   const requestRoute = useCallback(async (force = false) => {
     if (!driverCoordinate || isQaCoordinate || routeInFlightRef.current !== null) return;
@@ -239,6 +239,11 @@ export function DriverPickupMap({
   const displayedPickupCoordinate = routeState.status === 'ready'
     ? routeState.route.destination
     : pickupCoordinate;
+
+  const retryRoute = useCallback(() => {
+    routeInFlightRef.current = null;
+    void requestRoute(true);
+  }, [requestRoute]);
 
   const showOverview = useCallback((animated = true) => {
     if (!mapReady || !driverCoordinate || !displayedPickupCoordinate) return;
@@ -432,7 +437,16 @@ export function DriverPickupMap({
             <Text style={[styles.routeStatusMessage, { color: colors.textMuted }]}>{routeMessage.message}</Text>
           </View>
           {routeMessage.retry ? (
-            <Pressable onPress={() => void requestRoute(true)} accessibilityRole="button" hitSlop={8}>
+            <Pressable
+              onPress={retryRoute}
+              accessibilityRole="button"
+              accessibilityLabel="Retry pickup route"
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.routeRetry,
+                { backgroundColor: pressed ? colors.surfaceSelected : colors.surface },
+              ]}
+            >
               <Text style={[styles.bannerAction, { color: colors.primary }]}>Retry</Text>
             </Pressable>
           ) : null}
@@ -820,6 +834,14 @@ const styles = StyleSheet.create({
     height: 32,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  routeRetry: {
+    minWidth: 54,
+    minHeight: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm,
   },
   routeStatus: {
     minHeight: 62,

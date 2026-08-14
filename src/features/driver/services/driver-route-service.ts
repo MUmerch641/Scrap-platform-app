@@ -121,11 +121,18 @@ export async function fetchDriverJobRoute(
     return { success: false, reason: 'unavailable' };
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
   try {
     const { data, error } = await supabase.functions.invoke<RawDriverRoute>('driver-job-route', {
       body: { pickupJobId, origin },
+      signal: controller.signal,
     });
-    if (error) return { success: false, reason: mapFailure(await readFunctionErrorCode(error)) };
+    if (error) {
+      const reason = mapFailure(await readFunctionErrorCode(error));
+      if (__DEV__) console.warn('[driver-route-service] route request failed', { reason });
+      return { success: false, reason };
+    }
 
     const coordinates = typeof data?.encodedPolyline === 'string'
       ? decodeGooglePolyline(data.encodedPolyline)
@@ -138,7 +145,10 @@ export async function fetchDriverJobRoute(
       || !Number.isFinite(data.durationSeconds)
       || !isCoordinate(data.destination)
       || typeof data.generatedAt !== 'string'
-    ) return { success: false, reason: 'no-route' };
+    ) {
+      if (__DEV__) console.warn('[driver-route-service] route response was incomplete');
+      return { success: false, reason: 'no-route' };
+    }
 
     return {
       success: true,
@@ -151,6 +161,9 @@ export async function fetchDriverJobRoute(
       },
     };
   } catch {
+    if (__DEV__) console.warn('[driver-route-service] route request timed out or could not connect');
     return { success: false, reason: 'unavailable' };
+  } finally {
+    clearTimeout(timeout);
   }
 }
