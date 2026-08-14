@@ -27,7 +27,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Keyboard, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Linking, Modal, Platform, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 
 const ACTIVE_STATUSES = ['en_route', 'arrived', 'material_collected'] as const;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -82,15 +82,12 @@ export default function DriverActiveJobScreen() {
   const [driverNotesInput, setDriverNotesInput] = useState('');
   const [actualWeightError, setActualWeightError] = useState<string | undefined>();
   const [driverNotesError, setDriverNotesError] = useState<string | undefined>();
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [notesFocused, setNotesFocused] = useState(false);
   const [photos, setPhotos] = useState<DriverJobPhoto[]>([]);
   const [pendingPhotos, setPendingPhotos] = useState<PendingDriverJobPhoto[]>([]);
   const [photoPreview, setPhotoPreview] = useState<{ uri: string; label: string } | null>(null);
   const requestId = useRef(0);
   const hasLoadedJobRef = useRef(false);
   const transitioningRef = useRef(false);
-  const collectionScrollRef = useRef<ScrollView>(null);
   const uploadingPhotoIdsRef = useRef(new Set<string>());
 
   const refreshPhotos = useCallback(async (nextJobId: string) => {
@@ -124,28 +121,6 @@ export default function DriverActiveJobScreen() {
     () => subscribeToDriverJobsChanged(() => load()),
     [load],
   );
-
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSubscription = Keyboard.addListener(showEvent, (event) => {
-      setKeyboardHeight(event.endCoordinates.height);
-    });
-    const hideSubscription = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!notesFocused || keyboardHeight === 0) return;
-    const frame = requestAnimationFrame(() => {
-      collectionScrollRef.current?.scrollToEnd({ animated: true });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [keyboardHeight, notesFocused]);
 
   const uploadSelectedPhoto = useCallback(async (photo: PendingDriverJobPhoto) => {
     if (!job || uploadingPhotoIdsRef.current.has(photo.id)) return;
@@ -322,13 +297,13 @@ export default function DriverActiveJobScreen() {
   const nextAction = NEXT_ACTIONS[job.executionStatus];
   const qaPickupCoordinate = job.pickupCoordinate ? null : getQaPickupCoordinate();
   const pickupCoordinate = job.pickupCoordinate ?? qaPickupCoordinate;
-  return <ScreenScaffold mode="form" header={<AppHeader title="Job Details" subtitle={formatDriverStatus(job.executionStatus)} />} contentContainerStyle={styles.content} scrollViewRef={collectionScrollRef} androidKeyboardAvoidance>
+  return <ScreenScaffold mode="form" header={<AppHeader title="Job Details" subtitle={formatDriverStatus(job.executionStatus)} />} contentContainerStyle={styles.content} androidKeyboardAvoidance>
     <Section title="Customer" colors={colors}><Text style={[styles.customerName, { color: colors.text }]}>{job.customerName}</Text><Detail label="Phone" value={job.customerPhone} colors={colors} />{job.customerPhone.replace(/[^\d+]/g, '') ? <Button title="Call Customer" variant="outline" onPress={() => void callCustomer()} /> : null}</Section>
     <Section title="Pickup" colors={colors}><Detail label="Historical pickup address" value={job.pickupAddress} colors={colors} /><Detail label="Scheduled date" value={schedule.date} colors={colors} /><Detail label="Scheduled time" value={schedule.time} colors={colors} /><Detail label="Material" value={job.materialType} colors={colors} /><Detail label="Estimated weight" value={formatDriverWeight(job.estimatedWeight)} colors={colors} /></Section>
     <DriverPickupMap key={job.id} pickupJobId={job.id} pickupAddress={job.pickupAddress} pickupCoordinate={pickupCoordinate} isQaCoordinate={Boolean(qaPickupCoordinate)} />
     <Section title="Assignment" colors={colors}><Detail label="Vehicle" value={formatDriverVehicle(job.assignment.vehicle)} colors={colors} /><Detail label="Current status" value={formatDriverStatus(job.executionStatus)} colors={colors} />{job.deliveredToYardAt ? <Detail label="Delivered to yard" value={`${formatDriverSchedule(job.deliveredToYardAt).date} at ${formatDriverSchedule(job.deliveredToYardAt).time}`} colors={colors} /> : null}</Section>
     {job.pickupNotes ? <Section title="Pickup Instructions" colors={colors}><Text style={[styles.instructions, { color: colors.text }]}>{job.pickupNotes}</Text></Section> : null}
-    {job.executionStatus === 'arrived' ? <Section title="Collection Details" colors={colors}><Detail label="Estimated Weight" value={formatDriverWeight(job.estimatedWeight)} colors={colors} /><FormInput label="Actual Collected Weight (kg)" value={actualWeightInput} onChangeText={(value) => { setActualWeightInput(value); setActualWeightError(undefined); }} onFocus={() => setNotesFocused(false)} keyboardType="decimal-pad" returnKeyType="done" placeholder="Enter actual weight" error={actualWeightError} /><FormInput label="Driver Notes (Optional)" value={driverNotesInput} onChangeText={(value) => { setDriverNotesInput(value); setDriverNotesError(undefined); }} onFocus={() => setNotesFocused(true)} onBlur={() => setNotesFocused(false)} multiline numberOfLines={4} textAlignVertical="top" maxLength={1000} placeholder="Add collection details" error={driverNotesError} style={styles.notesInput} /><Text style={[styles.characterCount, { color: colors.textMuted }]}>{driverNotesInput.length}/1000</Text></Section> : null}
+    {job.executionStatus === 'arrived' ? <Section title="Collection Details" colors={colors}><Detail label="Estimated Weight" value={formatDriverWeight(job.estimatedWeight)} colors={colors} /><FormInput label="Actual Collected Weight (kg)" value={actualWeightInput} onChangeText={(value) => { setActualWeightInput(value); setActualWeightError(undefined); }} keyboardType="decimal-pad" returnKeyType="done" placeholder="Enter actual weight" error={actualWeightError} /><FormInput label="Driver Notes (Optional)" value={driverNotesInput} onChangeText={(value) => { setDriverNotesInput(value); setDriverNotesError(undefined); }} multiline numberOfLines={4} textAlignVertical="top" maxLength={1000} placeholder="Add collection details" error={driverNotesError} style={styles.notesInput} /><Text style={[styles.characterCount, { color: colors.textMuted }]}>{driverNotesInput.length}/1000</Text></Section> : null}
     {job.executionStatus === 'material_collected' || job.executionStatus === 'delivered_to_yard' ? <Section title="Collection Details" colors={colors}><Detail label="Actual Collected Weight" value={formatDriverWeight(job.actualCollectedWeight)} colors={colors} /><Detail label="Driver Notes" value={job.driverNotes ?? 'No driver notes'} colors={colors} /></Section> : null}
     {['arrived', 'material_collected', 'delivered_to_yard'].includes(job.executionStatus) ? <DriverJobPhotoSection title="Collection Photos" photoType="collection" photos={photos} pending={pendingPhotos} canAdd={job.executionStatus !== 'delivered_to_yard'} onTakePhoto={() => void selectPhoto('collection', 'camera')} onChoosePhoto={() => void selectPhoto('collection', 'library')} onRetry={(photo) => void uploadSelectedPhoto(photo)} onPreview={(uri, label) => setPhotoPreview({ uri, label })} /> : null}
     {['material_collected', 'delivered_to_yard'].includes(job.executionStatus) ? <DriverJobPhotoSection title="Delivery Photos" photoType="delivery" photos={photos} pending={pendingPhotos} canAdd={job.executionStatus === 'material_collected'} onTakePhoto={() => void selectPhoto('delivery', 'camera')} onChoosePhoto={() => void selectPhoto('delivery', 'library')} onRetry={(photo) => void uploadSelectedPhoto(photo)} onPreview={(uri, label) => setPhotoPreview({ uri, label })} /> : null}
