@@ -53,7 +53,14 @@
       ],
       "expo-secure-store",
       "expo-sqlite",
-      "expo-image"
+      "expo-image",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow ProCopper to take pickup and delivery evidence photos.",
+          "photosPermission": "Allow ProCopper to select pickup and delivery evidence photos."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

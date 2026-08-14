@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { RefObject } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -48,19 +48,22 @@ export interface ScreenScaffoldProps {
    */
   edges?: Edge[];
 
-  /**
-   * Adds additional space for the iOS floating native tab bar
-   *
-   * Default true
-   */
+  /** Adds space for the platform native tab bar. Default true. */
   avoidFloatingTabBar?: boolean;
+
+  /** Use Android keyboard resizing for a form when native window resize is insufficient. */
+  androidKeyboardAvoidance?: boolean;
 
   style?: ViewStyle;
   contentContainerStyle?: ViewStyle;
+
+  /** Optional access to the primary scroll container for focused form fields. */
+  scrollViewRef?: RefObject<ScrollView | null>;
 }
 
 const IOS_GLASS_TAB_BAR_HEIGHT = 62;
 const IOS_GLASS_TAB_BAR_BOTTOM_MARGIN = 14;
+const ANDROID_NATIVE_TAB_BAR_HEIGHT = 56;
 
 export function ScreenScaffold({
   children,
@@ -69,8 +72,10 @@ export function ScreenScaffold({
   iosNativeHeader = false,
   edges,
   avoidFloatingTabBar = true,
+  androidKeyboardAvoidance = false,
   style,
   contentContainerStyle,
+  scrollViewRef,
 }: ScreenScaffoldProps) {
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
@@ -85,11 +90,13 @@ export function ScreenScaffold({
   const resolvedHeader = usesIOSNativeHeader ? null : header;
 
   const extraBottomPadding =
-    Platform.OS === 'ios' && avoidFloatingTabBar
-      ? IOS_GLASS_TAB_BAR_HEIGHT +
-      IOS_GLASS_TAB_BAR_BOTTOM_MARGIN +
-      Math.max(insets.bottom, spacing.sm)
-      : 0;
+    !avoidFloatingTabBar
+      ? 0
+      : Platform.OS === 'ios'
+        ? IOS_GLASS_TAB_BAR_HEIGHT +
+          IOS_GLASS_TAB_BAR_BOTTOM_MARGIN +
+          Math.max(insets.bottom, spacing.sm)
+        : ANDROID_NATIVE_TAB_BAR_HEIGHT + Math.max(insets.bottom, spacing.sm);
 
   const containerStyle = [
     styles.container,
@@ -107,6 +114,7 @@ export function ScreenScaffold({
   if (isScrollable) {
     const scrollContent = (
       <ScrollView
+        ref={scrollViewRef}
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
@@ -130,14 +138,10 @@ export function ScreenScaffold({
       >
         {resolvedHeader}
 
-        {isForm ? (
+        {isForm && (Platform.OS === 'ios' || androidKeyboardAvoidance) ? (
           <KeyboardAvoidingView
             style={styles.flex}
-            behavior={
-              Platform.OS === 'ios'
-                ? 'padding'
-                : 'height'
-            }
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={0}
             enabled
           >

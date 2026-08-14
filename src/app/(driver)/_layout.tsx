@@ -1,16 +1,58 @@
 import { useUserRole } from '@/context/UserRoleContext';
+import { useNetworkStatus } from '@/context/NetworkStatusContext';
 import { AuthLoadingScreen } from '@/components/auth/auth-loading-screen';
+import { DriverJobRealtimeSubscription, subscribeToDriverJobRealtime } from '@/features/driver/services/driver-job-realtime';
 import { ROLES } from '@/shared/roles';
 import { semanticColors, typography } from '@/shared/theme';
 import { Redirect } from 'expo-router';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { Platform, useColorScheme } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { AppState, Platform, useColorScheme } from 'react-native';
 
 export default function DriverLayout() {
   const { session, role, isInitialLoading } = useUserRole();
+  const { isOnline } = useNetworkStatus();
   const colorScheme = useColorScheme();
+  const realtimeRef = useRef<DriverJobRealtimeSubscription | null>(null);
+  const hasObservedNetworkRef = useRef(false);
+  const driverSessionId = role === ROLES.DRIVER ? session?.user.id : undefined;
   const isDark = colorScheme === 'dark';
   const colors = semanticColors[isDark ? 'dark' : 'light'];
+
+  useEffect(() => {
+    if (!driverSessionId) return;
+    const subscription = subscribeToDriverJobRealtime();
+    realtimeRef.current = subscription;
+
+    return () => {
+      if (realtimeRef.current === subscription) realtimeRef.current = null;
+      subscription.unsubscribe();
+    };
+  }, [driverSessionId]);
+
+  useEffect(() => {
+    if (!driverSessionId) {
+      hasObservedNetworkRef.current = false;
+      return;
+    }
+    if (!hasObservedNetworkRef.current) {
+      hasObservedNetworkRef.current = true;
+      return;
+    }
+    if (isOnline) realtimeRef.current?.scheduleRefresh();
+  }, [driverSessionId, isOnline]);
+
+  useEffect(() => {
+    if (!driverSessionId) return;
+    let previousAppState = AppState.currentState;
+    const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+      const returnedToForeground = previousAppState !== 'active' && nextAppState === 'active';
+      previousAppState = nextAppState;
+      if (returnedToForeground) realtimeRef.current?.scheduleRefresh();
+    });
+
+    return () => appStateSubscription.remove();
+  }, [driverSessionId]);
 
   if (isInitialLoading) return <AuthLoadingScreen />;
   if (!session) return <Redirect href="/(auth)/sign-in" />;
