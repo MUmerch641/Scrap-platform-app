@@ -1,6 +1,7 @@
 import { supabase, supabaseConfigurationError } from '@/services/supabase-client';
 
 import {
+  DriverCoordinate,
   DriverExecutionStatus,
   DriverJob,
   VehicleSummary,
@@ -8,6 +9,11 @@ import {
 
 const MAX_PAGE_SIZE = 100;
 export const DRIVER_JOB_PAGE_SIZE = 20;
+export const DRIVER_EXECUTION_FIELD_LIMITS = {
+  actualCollectedWeightKg: 1_000_000,
+  driverNotes: 1000,
+} as const;
+const WEIGHT_PATTERN = /^(?:\d+(?:\.\d+)?|\.\d+)$/;
 
 export type DriverJobSort = 'scheduled_asc' | 'delivered_desc';
 
@@ -35,6 +41,25 @@ export interface DriverJobSummaryResult {
   error?: string;
 }
 
+export type DriverJobTransitionFailure = 'assignment-unavailable' | 'invalid-transition' | 'unavailable';
+
+export interface DriverJobTransitionResult {
+  success: boolean;
+  executionStatus?: DriverExecutionStatus;
+  transitionApplied?: boolean;
+  failure?: DriverJobTransitionFailure;
+  error?: string;
+}
+
+export interface DriverMaterialCollectionInput {
+  actualCollectedWeight: number;
+  driverNotes: string | null;
+}
+
+export type DriverMaterialCollectionValidationResult =
+  | { success: true; value: DriverMaterialCollectionInput }
+  | { success: false; field: 'weight' | 'notes'; error: string };
+
 interface RawDriverJob {
   id: string;
   execution_status: DriverExecutionStatus;
@@ -42,6 +67,8 @@ interface RawDriverJob {
   customer_name: string;
   customer_phone: string;
   pickup_address: string;
+  pickup_latitude?: number | string | null;
+  pickup_longitude?: number | string | null;
   material_type: string;
   estimated_weight: number | string | null;
   pickup_notes: string | null;
@@ -52,10 +79,26 @@ interface RawDriverJob {
   vehicle_label: string;
   vehicle_registration_number: string | null;
   actual_collected_weight: number | string | null;
+  driver_notes: string | null;
   en_route_at: string | null;
   arrived_at: string | null;
   material_collected_at: string | null;
   delivered_to_yard_at: string | null;
+}
+
+function mapPickupCoordinate(row: RawDriverJob): DriverCoordinate | null {
+  if (row.pickup_latitude == null || row.pickup_longitude == null) return null;
+  const latitude = Number(row.pickup_latitude);
+  const longitude = Number(row.pickup_longitude);
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) return null;
+  return { latitude, longitude };
 }
 
 function getDeviceTimeZone(): string {
@@ -76,6 +119,7 @@ function mapJob(row: RawDriverJob): DriverJob {
     customerName: row.customer_name,
     customerPhone: row.customer_phone,
     pickupAddress: row.pickup_address,
+    pickupCoordinate: mapPickupCoordinate(row),
     materialType: row.material_type,
     estimatedWeight: row.estimated_weight == null ? null : Number(row.estimated_weight),
     pickupNotes: row.pickup_notes,
@@ -87,6 +131,7 @@ function mapJob(row: RawDriverJob): DriverJob {
     },
     actualCollectedWeight:
       row.actual_collected_weight == null ? null : Number(row.actual_collected_weight),
+    driverNotes: row.driver_notes,
     enRouteAt: row.en_route_at,
     arrivedAt: row.arrived_at,
     materialCollectedAt: row.material_collected_at,
@@ -97,6 +142,82 @@ function mapJob(row: RawDriverJob): DriverJob {
 function mapError(operation: string, error: { code?: string } | null): string {
   if (__DEV__) console.warn(`[driver-job-service] ${operation} failed`, { code: error?.code });
   return 'Unable to load jobs. Check your connection and try again.';
+}
+
+export function validateDriverMaterialCollectionInput(
+  actualCollectedWeightInput: string,
+  driverNotesInput: string,
+): DriverMaterialCollectionValidationResult {
+  const weight = actualCollectedWeightInput.trim();
+  if (!weight) {
+    return { success: false, field: 'weight', error: 'Actual collected weight is required.' };
+  }
+  if (!WEIGHT_PATTERN.test(weight)) {
+    return { success: false, field: 'weight', error: 'Enter a valid weight in kg.' };
+  }
+
+  const actualCollectedWeight = Number(weight);
+  if (!Number.isFinite(actualCollectedWeight)) {
+    return { success: false, field: 'weight', error: 'Actual collected weight must be a finite number.' };
+  }
+  if (actualCollectedWeight < 0) {
+    return { success: false, field: 'weight', error: 'Actual collected weight cannot be negative.' };
+  }
+  if (actualCollectedWeight > DRIVER_EXECUTION_FIELD_LIMITS.actualCollectedWeightKg) {
+    return {
+      success: false,
+      field: 'weight',
+      error: `Actual collected weight must be ${DRIVER_EXECUTION_FIELD_LIMITS.actualCollectedWeightKg.toLocaleString()} kg or less.`,
+    };
+  }
+
+  const driverNotes = driverNotesInput.trim() || null;
+  if (driverNotes && driverNotes.length > DRIVER_EXECUTION_FIELD_LIMITS.driverNotes) {
+    return {
+      success: false,
+      field: 'notes',
+      error: `Driver notes must be ${DRIVER_EXECUTION_FIELD_LIMITS.driverNotes} characters or fewer.`,
+    };
+  }
+
+  return { success: true, value: { actualCollectedWeight, driverNotes } };
+}
+
+function mapTransitionError(error: { code?: string; message?: string } | null): DriverJobTransitionResult {
+  const message = error?.message?.toLowerCase() ?? '';
+  if (message.includes('no longer assigned') || message.includes('access is no longer available')) {
+    return {
+      success: false,
+      failure: 'assignment-unavailable',
+      error: 'This job is no longer assigned to you. It has been refreshed.',
+    };
+  }
+  if (message.includes('cannot move') || message.includes('cannot record')) {
+    return {
+      success: false,
+      failure: 'invalid-transition',
+      error: 'This job status changed before your update. It has been refreshed.',
+    };
+  }
+  if (message.includes('job is unavailable')) {
+    return {
+      success: false,
+      failure: 'unavailable',
+      error: 'This job is no longer available.',
+    };
+  }
+  if (message.includes('already been recorded')) {
+    return {
+      success: false,
+      failure: 'invalid-transition',
+      error: 'Collection data was already recorded differently. The job has been refreshed.',
+    };
+  }
+  if (__DEV__) console.warn('[driver-job-service] transition job failed', { code: error?.code });
+  return {
+    success: false,
+    error: 'Unable to update this job. Check your connection and try again.',
+  };
 }
 
 export function formatDriverLocalDate(date: Date): string {
@@ -145,5 +266,75 @@ export async function fetchDriverJobSummary(localDate: string): Promise<DriverJo
     return { success: true, todayJobs: summary.today_jobs, completedToday: summary.completed_today };
   } catch {
     return { success: false, todayJobs: 0, completedToday: 0, error: 'Unable to connect to service. Check your connection and try again.' };
+  }
+}
+
+export async function transitionDriverJob(
+  jobId: string,
+  targetStatus: DriverExecutionStatus,
+): Promise<DriverJobTransitionResult> {
+  if (supabaseConfigurationError) {
+    return { success: false, error: supabaseConfigurationError };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('transition_driver_job', {
+      p_job_id: jobId,
+      p_target_status: targetStatus,
+    });
+    if (error) return mapTransitionError(error);
+
+    const result = (data?.[0] ?? null) as {
+      execution_status?: DriverExecutionStatus;
+      transition_applied?: boolean;
+    } | null;
+    if (!result?.execution_status) {
+      return { success: false, error: 'Unable to confirm the job update. Please refresh and try again.' };
+    }
+
+    return {
+      success: true,
+      executionStatus: result.execution_status,
+      transitionApplied: result.transition_applied ?? false,
+    };
+  } catch {
+    return {
+      success: false,
+      error: 'Unable to update this job. Check your connection and try again.',
+    };
+  }
+}
+
+export async function recordDriverMaterialCollection(
+  jobId: string,
+  input: DriverMaterialCollectionInput,
+): Promise<DriverJobTransitionResult> {
+  if (supabaseConfigurationError) {
+    return { success: false, error: supabaseConfigurationError };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('record_driver_material_collection', {
+      p_job_id: jobId,
+      p_actual_collected_weight: input.actualCollectedWeight,
+      p_driver_notes: input.driverNotes,
+    });
+    if (error) return mapTransitionError(error);
+
+    const result = (data?.[0] ?? null) as {
+      execution_status?: DriverExecutionStatus;
+      transition_applied?: boolean;
+    } | null;
+    if (!result?.execution_status) {
+      return { success: false, error: 'Unable to confirm material collection. Please refresh and try again.' };
+    }
+
+    return {
+      success: true,
+      executionStatus: result.execution_status,
+      transitionApplied: result.transition_applied ?? false,
+    };
+  } catch {
+    return { success: false, error: 'Unable to record material collection. Check your connection and try again.' };
   }
 }

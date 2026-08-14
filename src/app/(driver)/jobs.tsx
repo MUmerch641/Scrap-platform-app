@@ -12,6 +12,7 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, Text, useColorScheme, 
 
 import { DriverJobCard } from '@/features/driver/components/driver-job-card';
 import { DRIVER_JOB_PAGE_SIZE, DriverJobPageOptions, fetchDriverJobs, formatDriverLocalDate } from '@/features/driver/services/driver-job-service';
+import { subscribeToDriverJobsChanged } from '@/features/driver/services/driver-job-refresh';
 import { DriverExecutionStatus, DriverJob } from '@/features/driver/types';
 
 type JobsFilter = 'today' | 'upcoming' | 'completed';
@@ -26,8 +27,12 @@ function optionsFor(filter: JobsFilter, page: number): DriverJobPageOptions { re
 export default function DriverJobsScreen() {
   const router = useRouter(); const { isOffline } = useNetworkStatus(); const colors = semanticColors[useColorScheme() === 'dark' ? 'dark' : 'light'];
   const [filter, setFilter] = useState<JobsFilter>('today'); const [jobs, setJobs] = useState<DriverJob[]>([]); const [hasMore, setHasMore] = useState(false); const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false); const [loadingMore, setLoadingMore] = useState(false); const [error, setError] = useState<string | null>(null); const requestId = useRef(0);
-  const load = useCallback(async (refresh = false) => { if (isOffline) { setLoading(false); setRefreshing(false); return; } const id = ++requestId.current; if (refresh) setRefreshing(true); else setLoading(true); setError(null); const [result, active] = await Promise.all([fetchDriverJobs(optionsFor(filter, 0)), filter === 'today' ? fetchDriverJobs({ page: 0, pageSize: 2, executionStatuses: ACTIVE_STATUSES }) : Promise.resolve(null)]); if (id !== requestId.current) return; if (result.success) { const firstPageJobs = active?.success ? [...active.jobs, ...result.jobs.filter(job => !active.jobs.some(activeJob => activeJob.id === job.id))] : result.jobs; setJobs(firstPageJobs); setHasMore(result.hasMore); } else if (!jobs.length) setError(result.error ?? 'Unable to load jobs.'); setLoading(false); setRefreshing(false); }, [filter, isOffline, jobs.length]);
+  const load = useCallback(async (refresh = false, quiet = false) => { if (isOffline) { setLoading(false); setRefreshing(false); return; } const id = ++requestId.current; if (refresh) setRefreshing(true); else if (!quiet) setLoading(true); setError(null); const [result, active] = await Promise.all([fetchDriverJobs(optionsFor(filter, 0)), filter === 'today' ? fetchDriverJobs({ page: 0, pageSize: 2, executionStatuses: ACTIVE_STATUSES }) : Promise.resolve(null)]); if (id !== requestId.current) return; if (result.success) { const firstPageJobs = active?.success ? [...active.jobs, ...result.jobs.filter(job => !active.jobs.some(activeJob => activeJob.id === job.id))] : result.jobs; setJobs(firstPageJobs); setHasMore(result.hasMore); } else if (!jobs.length) setError(result.error ?? 'Unable to load jobs.'); if (!quiet) setLoading(false); setRefreshing(false); }, [filter, isOffline, jobs.length]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
+  React.useEffect(
+    () => subscribeToDriverJobsChanged(() => load(false, true)),
+    [load],
+  );
   const loadMore = async () => { if (isOffline || !hasMore || loadingMore || loading || refreshing) return; setLoadingMore(true); const id = ++requestId.current; const result = await fetchDriverJobs(optionsFor(filter, Math.ceil(jobs.length / DRIVER_JOB_PAGE_SIZE))); if (id === requestId.current && result.success) { setJobs(previous => [...previous, ...result.jobs.filter(job => !previous.some(existing => existing.id === job.id))]); setHasMore(result.hasMore); } setLoadingMore(false); };
   const title = emptyCopy(filter);
   if (loading && !jobs.length) return <ScreenScaffold header={<AppHeader title="Jobs" subtitle="Your assigned pickups" />}><LoadingState message="Loading your jobs..." /></ScreenScaffold>;

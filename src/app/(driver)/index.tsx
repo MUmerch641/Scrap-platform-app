@@ -13,6 +13,7 @@ import { StyleSheet, Text, useColorScheme, View } from 'react-native';
 
 import { DriverJobCard } from '@/features/driver/components/driver-job-card';
 import { fetchDriverJobSummary, fetchDriverJobs, formatDriverLocalDate } from '@/features/driver/services/driver-job-service';
+import { subscribeToDriverJobsChanged } from '@/features/driver/services/driver-job-refresh';
 import { DriverJob } from '@/features/driver/types';
 
 const ACTIVE_STATUSES = ['en_route', 'arrived', 'material_collected'] as const;
@@ -49,6 +50,11 @@ export default function DriverHomeScreen() {
   }, [isOffline]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
+
+  React.useEffect(
+    () => subscribeToDriverJobsChanged(() => load()),
+    [load],
+  );
 
   const openJob = (job: DriverJob) => router.push({ pathname: '/(driver)/active-job', params: { jobId: job.id } });
   const hasData = activeJobs.length > 0 || nextJob !== null || counts.today > 0 || counts.completed > 0;

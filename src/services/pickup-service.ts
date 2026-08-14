@@ -175,6 +175,17 @@ function logPickupDatabaseError(operation: string, error: { code?: string } | nu
   }
 }
 
+function requestPickupGeocoding(pickupRequestId: string): void {
+  void supabase.functions
+    .invoke('geocode-pickup-request', { body: { pickupRequestId } })
+    .then(({ error }) => {
+      if (error) logPickupDatabaseError('queue pickup geocoding', null);
+    })
+    .catch(() => {
+      // Geocoding is intentionally non-blocking; the pickup remains valid without coordinates.
+    });
+}
+
 function mapRowToPickupRequest(row: RawPickupRequestRow): PickupRequest {
   const customer = Array.isArray(row.customers)
     ? row.customers[0]
@@ -605,14 +616,22 @@ export async function createPickupRequest(
     if (error) {
       logPickupDatabaseError('submit pickup request', error);
       const confirmation = await findPickupByClientRequestId(clientRequestId);
-      if (confirmation.success && confirmation.request) return confirmation;
+      if (confirmation.success && confirmation.request) {
+        requestPickupGeocoding(confirmation.request.id);
+        return confirmation;
+      }
       return { success: false, error: 'Unable to submit pickup request. Please try again.' };
     }
 
-    return { success: true, request: mapRowToPickupRequest(data as RawPickupRequestRow) };
+    const request = mapRowToPickupRequest(data as RawPickupRequestRow);
+    requestPickupGeocoding(request.id);
+    return { success: true, request };
   } catch {
     const confirmation = await findPickupByClientRequestId(clientRequestId);
-    if (confirmation.success && confirmation.request) return confirmation;
+    if (confirmation.success && confirmation.request) {
+      requestPickupGeocoding(confirmation.request.id);
+      return confirmation;
+    }
     return { success: false, error: 'Unable to connect to service. Check network.' };
   }
 }
