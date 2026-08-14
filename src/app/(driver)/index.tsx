@@ -12,7 +12,6 @@ import { ScreenScaffold } from '@/components/ui/screen-scaffold';
 import { useNetworkStatus } from '@/context/NetworkStatusContext';
 import { useUserRole } from '@/context/UserRoleContext';
 import { DriverJobCard } from '@/features/driver/components/driver-job-card';
-import { DriverStatusPill } from '@/features/driver/components/driver-status-pill';
 import { formatDriverSchedule, formatDriverVehicle } from '@/features/driver/driver-job-formatters';
 import { subscribeToDriverJobsChanged } from '@/features/driver/services/driver-job-refresh';
 import { fetchDriverJobSummary, fetchDriverJobs, formatDriverLocalDate } from '@/features/driver/services/driver-job-service';
@@ -103,18 +102,11 @@ export default function DriverHomeScreen() {
               <Text style={[styles.eyebrow, { color: colors.accent }]}>{activeJob ? 'CURRENT JOB' : 'NEXT PICKUP'}</Text>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>{activeJob ? 'Continue where you left off' : 'Up next'}</Text>
             </View>
-            <DriverStatusPill status={primaryJob.executionStatus} />
           </View>
           <DriverJobCard job={primaryJob} prominent onPress={() => openJob(primaryJob)} />
-          <View style={[styles.nextStep, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.nextIcon, { backgroundColor: colors.background }]}><Ionicons name="arrow-forward" size={18} color={colors.accent} /></View>
-            <View style={styles.nextCopy}>
-              <Text style={[styles.nextLabel, { color: colors.textMuted }]}>NEXT ACTION</Text>
-              <Text style={[styles.nextValue, { color: colors.text }]}>{nextActionCopy(primaryJob)}</Text>
-            </View>
-            <Pressable onPress={() => openJob(primaryJob)} accessibilityRole="button" accessibilityLabel="Open job" hitSlop={10}>
-              <Ionicons name="chevron-forward-circle" size={28} color={colors.primary} />
-            </Pressable>
+          <View style={styles.nextStep}>
+            <Text style={[styles.nextLabel, { color: colors.textMuted }]}>Next:</Text>
+            <Text style={[styles.nextValue, { color: colors.text }]}>{nextActionCopy(primaryJob)}</Text>
           </View>
           <Button title={activeJob ? 'Resume Active Job' : 'View Pickup Details'} onPress={() => openJob(primaryJob)} style={styles.primaryAction} />
         </View>
@@ -196,10 +188,8 @@ const styles = StyleSheet.create({
   sectionHeading: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md },
   eyebrow: { fontFamily: typography.fontFamily.bodyBold, fontSize: 10, letterSpacing: 1.1 },
   sectionTitle: { marginTop: 2, fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg },
-  nextStep: { minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm },
-  nextIcon: { width: 38, height: 38, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
-  nextCopy: { flex: 1, gap: 2 },
-  nextLabel: { fontFamily: typography.fontFamily.bodyBold, fontSize: 9, letterSpacing: 0.8 },
+  nextStep: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, paddingHorizontal: spacing.xs },
+  nextLabel: { fontFamily: typography.fontFamily.bodyBold, fontSize: typography.fontSize.sm },
   nextValue: { fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm },
   primaryAction: { minHeight: 52, borderRadius: radius.lg },
   clearState: { alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.xl },

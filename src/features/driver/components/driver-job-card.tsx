@@ -36,7 +36,6 @@ export function DriverJobCard({
         Platform.OS === 'android' && styles.androidShadow,
       ]}
     >
-      <View style={[styles.accent, { backgroundColor: completed ? colors.border : prominent ? brandColors.copper : brandColors.navy }]} />
       <View style={styles.content}>
         <View style={styles.topRow}>
           <View style={styles.titleBlock}>
@@ -80,14 +79,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderRadius: radius.xl,
-    shadowColor: brandColors.navy,
-    shadowOpacity: 0.06,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 5 },
   },
-  prominentCard: { borderWidth: 1.25 },
-  androidShadow: { elevation: 2 },
-  accent: { width: 5 },
+  prominentCard: { borderWidth: 1 },
+  androidShadow: { elevation: 1 },
   content: { flex: 1, padding: spacing.md, gap: spacing.md },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   titleBlock: { flex: 1, gap: 3 },

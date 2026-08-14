@@ -308,9 +308,7 @@ export function DriverPickupMap({
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.headingRow}>
-        <View style={[styles.headingIcon, { backgroundColor: colors.background }]}>
-          <Ionicons name="navigate-circle-outline" size={23} color={colors.accent} />
-        </View>
+        <Ionicons name="navigate-circle-outline" size={23} color={colors.accent} />
         <View style={styles.headingCopy}>
           <Text style={[styles.title, { color: colors.text }]}>Pickup map</Text>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>Location and traffic-aware route</Text>
@@ -723,13 +721,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   headingCopy: { flex: 1, gap: 2 },
-  headingIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   title: {
     fontFamily: typography.fontFamily.headingSemibold,
     fontSize: typography.fontSize.md,

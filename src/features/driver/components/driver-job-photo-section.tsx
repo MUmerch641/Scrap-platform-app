@@ -28,9 +28,7 @@ export function DriverJobPhotoSection({ title, photoType, photos, pending, canAd
   return (
     <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.headingRow}>
-        <View style={[styles.headingIcon, { backgroundColor: colors.background }]}>
-          <Ionicons name={photoType === 'collection' ? 'camera-outline' : 'business-outline'} size={20} color={colors.accent} />
-        </View>
+        <Ionicons name={photoType === 'collection' ? 'camera-outline' : 'business-outline'} size={20} color={colors.accent} />
         <View style={styles.headingCopy}>
           <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>{photoType === 'collection' ? 'Document material at pickup' : 'Confirm evidence at the yard'}</Text>
@@ -43,7 +41,7 @@ export function DriverJobPhotoSection({ title, photoType, photos, pending, canAd
 
       {canAdd ? (
         <View style={styles.actions}>
-          <PhotoAction label="Take Photo" icon="camera" primary color={colors.primary} onPress={onTakePhoto} accessibilityLabel={`Take ${photoType} photo`} />
+          <PhotoAction label="Take Photo" icon="camera" primary color={colors.primary} onColor={colors.onPrimary} onPress={onTakePhoto} accessibilityLabel={`Take ${photoType} photo`} />
           <PhotoAction label="Photo Library" icon="images-outline" color={colors.primary} onPress={onChoosePhoto} accessibilityLabel={`Choose ${photoType} photo from library`} />
         </View>
       ) : null}
@@ -83,7 +81,7 @@ export function DriverJobPhotoSection({ title, photoType, photos, pending, canAd
   );
 }
 
-function PhotoAction({ label, icon, primary = false, color, onPress, accessibilityLabel }: { label: string; icon: 'camera' | 'images-outline'; primary?: boolean; color: string; onPress: () => void; accessibilityLabel: string }) {
+function PhotoAction({ label, icon, primary = false, color, onColor = brandColors.white, onPress, accessibilityLabel }: { label: string; icon: 'camera' | 'images-outline'; primary?: boolean; color: string; onColor?: string; onPress: () => void; accessibilityLabel: string }) {
   return (
     <Pressable
       onPress={onPress}
@@ -91,8 +89,8 @@ function PhotoAction({ label, icon, primary = false, color, onPress, accessibili
       accessibilityLabel={accessibilityLabel}
       style={({ pressed }) => [styles.action, { borderColor: color, backgroundColor: primary ? color : 'transparent', opacity: pressed ? 0.72 : 1 }]}
     >
-      <Ionicons name={icon} size={18} color={primary ? brandColors.white : color} />
-      <Text style={[styles.actionText, { color: primary ? brandColors.white : color }]}>{label}</Text>
+      <Ionicons name={icon} size={18} color={primary ? onColor : color} />
+      <Text style={[styles.actionText, { color: primary ? onColor : color }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -119,7 +117,6 @@ function PhotoTile({ uri, label, status, onPress, colors }: { uri: string | null
 const styles = StyleSheet.create({
   section: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.md },
   headingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  headingIcon: { width: 42, height: 42, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   headingCopy: { flex: 1, gap: 2 },
   title: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.md },
   subtitle: { fontFamily: typography.fontFamily.body, fontSize: 10 },

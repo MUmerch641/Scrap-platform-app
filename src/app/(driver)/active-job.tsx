@@ -322,9 +322,9 @@ export default function DriverActiveJobScreen() {
       <DriverJobProgress status={job.executionStatus} />
 
       {nextAction ? (
-        <View style={[styles.nextStepBanner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={[styles.nextStepIcon, { backgroundColor: colors.background }]}><Ionicons name="arrow-forward" size={19} color={colors.accent} /></View>
-          <View style={styles.nextStepCopy}><Text style={[styles.smallEyebrow, { color: colors.accent }]}>YOUR NEXT STEP</Text><Text style={[styles.nextStepTitle, { color: colors.text }]}>{nextAction.title}</Text><Text style={[styles.nextStepText, { color: colors.textMuted }]}>{nextStepDescription(job.executionStatus)}</Text></View>
+        <View style={styles.nextStepBanner}>
+          <Text style={[styles.nextStepLabel, { color: colors.textMuted }]}>Next step</Text>
+          <View style={styles.nextStepCopy}><Text style={[styles.nextStepTitle, { color: colors.text }]}>{nextAction.title}</Text><Text style={[styles.nextStepText, { color: colors.textMuted }]}>{nextStepDescription(job.executionStatus)}</Text></View>
         </View>
       ) : null}
 
@@ -350,7 +350,7 @@ export default function DriverActiveJobScreen() {
 
       {['arrived', 'material_collected', 'delivered_to_yard'].includes(job.executionStatus) ? (
         <View style={styles.stageBlock}>
-          <StageHeading number="01" title="Photo evidence" subtitle="Capture a clear record of the pickup" colors={colors} />
+          <StageHeading title="Photo evidence" subtitle="Capture a clear record of the pickup" colors={colors} />
           <DriverJobPhotoSection title="Collection Photos" photoType="collection" photos={photos} pending={pendingPhotos} canAdd={job.executionStatus !== 'delivered_to_yard'} onTakePhoto={() => void selectPhoto('collection', 'camera')} onChoosePhoto={() => void selectPhoto('collection', 'library')} onRetry={(photo) => void uploadSelectedPhoto(photo)} onPreview={(uri, label) => setPhotoPreview({ uri, label })} />
           {['material_collected', 'delivered_to_yard'].includes(job.executionStatus) ? <DriverJobPhotoSection title="Delivery Photos" photoType="delivery" photos={photos} pending={pendingPhotos} canAdd={job.executionStatus === 'material_collected'} onTakePhoto={() => void selectPhoto('delivery', 'camera')} onChoosePhoto={() => void selectPhoto('delivery', 'library')} onRetry={(photo) => void uploadSelectedPhoto(photo)} onPreview={(uri, label) => setPhotoPreview({ uri, label })} /> : null}
         </View>
@@ -358,7 +358,7 @@ export default function DriverActiveJobScreen() {
 
       {job.executionStatus === 'arrived' ? (
         <View style={styles.stageBlock}>
-          <StageHeading number="02" title="Material collection" subtitle="Record the verified load before continuing" colors={colors} />
+          <StageHeading title="Material collection" subtitle="Record the verified load before continuing" colors={colors} />
           <OperationalSection title="Collection details" subtitle={`Estimated ${formatDriverWeight(job.estimatedWeight)}`} icon="scale-outline" colors={colors}>
             <FormInput label="Actual collected weight (kg)" value={actualWeightInput} onChangeText={(value) => { setActualWeightInput(value); setActualWeightError(undefined); }} keyboardType="decimal-pad" returnKeyType="done" showDoneAccessory placeholder="Enter verified weight" error={actualWeightError} />
             <FormInput label="Driver notes (optional)" value={driverNotesInput} onChangeText={(value) => { setDriverNotesInput(value); setDriverNotesError(undefined); }} multiline numberOfLines={4} textAlignVertical="top" maxLength={1000} showDoneAccessory placeholder="Condition, access details, or collection notes" error={driverNotesError} style={styles.notesInput} />
@@ -376,7 +376,7 @@ export default function DriverActiveJobScreen() {
 
       {nextAction ? (
         <View style={[styles.actionSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.actionHeading}><View style={[styles.actionIcon, { backgroundColor: colors.background }]}><Ionicons name="flag-outline" size={20} color={colors.accent} /></View><View style={styles.actionCopy}><Text style={[styles.smallEyebrow, { color: colors.accent }]}>READY TO CONTINUE?</Text><Text style={[styles.actionTitle, { color: colors.text }]}>{nextAction.title}</Text></View></View>
+          <View style={styles.actionCopy}><Text style={[styles.actionTitle, { color: colors.text }]}>{nextAction.title}</Text><Text style={[styles.actionDescription, { color: colors.textMuted }]}>{nextStepDescription(job.executionStatus)}</Text></View>
           <Button title={nextAction.title} onPress={confirmTransition} loading={transitioning} disabled={isOffline} style={styles.primaryAction} />
           {isOffline ? <Text style={[styles.actionHint, { color: colors.warning }]}>Reconnect before changing job status.</Text> : null}
           {transitionError ? <Text style={[styles.actionError, { color: colors.danger }]}>{transitionError}</Text> : null}
@@ -392,9 +392,9 @@ export default function DriverActiveJobScreen() {
 
 function nextStepDescription(status: DriverJob['executionStatus']): string { if (status === 'assigned') return 'Review the pickup and begin driving when ready.'; if (status === 'en_route') return 'Mark your arrival once you are safely at the pickup.'; if (status === 'arrived') return 'Add evidence and record the collected material.'; return 'Complete delivery after reaching the yard.'; }
 function HeroMeta({ label, value }: { label: string; value: string }) { return <View style={styles.heroMeta}><Text style={styles.heroMetaLabel}>{label}</Text><Text style={styles.heroMetaValue} numberOfLines={1}>{value}</Text></View>; }
-function OperationalSection({ title, subtitle, icon, colors, children }: { title: string; subtitle: string; icon: React.ComponentProps<typeof Ionicons>['name']; colors: (typeof semanticColors)[keyof typeof semanticColors]; children: React.ReactNode }) { return <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={styles.sectionHeading}><View style={[styles.sectionIcon, { backgroundColor: colors.background }]}><Ionicons name={icon} size={20} color={colors.accent} /></View><View style={styles.sectionHeadingCopy}><Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>{subtitle}</Text></View></View>{children}</View>; }
+function OperationalSection({ title, subtitle, icon, colors, children }: { title: string; subtitle: string; icon: React.ComponentProps<typeof Ionicons>['name']; colors: (typeof semanticColors)[keyof typeof semanticColors]; children: React.ReactNode }) { return <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={styles.sectionHeading}><Ionicons name={icon} size={20} color={colors.accent} /><View style={styles.sectionHeadingCopy}><Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>{subtitle}</Text></View></View>{children}</View>; }
 function InfoItem({ icon, label, value, colors }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; value: string; colors: (typeof semanticColors)[keyof typeof semanticColors] }) { return <View style={styles.infoItem}><Ionicons name={icon} size={17} color={colors.accent} /><View style={styles.infoCopy}><Text style={[styles.infoLabel, { color: colors.textMuted }]}>{label}</Text><Text style={[styles.infoValue, { color: colors.text }]}>{value}</Text></View></View>; }
-function StageHeading({ number, title, subtitle, colors }: { number: string; title: string; subtitle: string; colors: (typeof semanticColors)[keyof typeof semanticColors] }) { return <View style={styles.stageHeading}><Text style={[styles.stageNumber, { color: colors.accent }]}>{number}</Text><View style={styles.stageHeadingCopy}><Text style={[styles.stageTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.stageSubtitle, { color: colors.textMuted }]}>{subtitle}</Text></View></View>; }
+function StageHeading({ title, subtitle, colors }: { title: string; subtitle: string; colors: (typeof semanticColors)[keyof typeof semanticColors] }) { return <View style={styles.stageHeading}><Text style={[styles.stageTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.stageSubtitle, { color: colors.textMuted }]}>{subtitle}</Text></View>; }
 const styles = StyleSheet.create({
   content: { gap: spacing.md, paddingTop: spacing.md },
   overviewHero: { marginHorizontal: -spacing.md, marginTop: -spacing.md, padding: spacing.lg, gap: spacing.sm, backgroundColor: brandColors.navy, borderBottomLeftRadius: radius.xl, borderBottomRightRadius: radius.xl },
@@ -408,15 +408,13 @@ const styles = StyleSheet.create({
   heroMetaLabel: { color: 'rgba(251,252,248,0.60)', fontFamily: typography.fontFamily.bodyMedium, fontSize: 9 },
   heroMetaValue: { color: brandColors.white, fontFamily: typography.fontFamily.bodyBold, fontSize: 11 },
   heroMetaDivider: { width: StyleSheet.hairlineWidth, height: 30, marginHorizontal: spacing.sm, backgroundColor: 'rgba(251,252,248,0.18)' },
-  nextStepBanner: { minHeight: 80, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
-  nextStepIcon: { width: 44, height: 44, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
+  nextStepBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingHorizontal: spacing.xs },
+  nextStepLabel: { width: 66, fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.xs },
   nextStepCopy: { flex: 1, gap: 2 },
-  smallEyebrow: { fontFamily: typography.fontFamily.bodyBold, fontSize: 9, letterSpacing: 1 },
   nextStepTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.md },
   nextStepText: { fontFamily: typography.fontFamily.body, fontSize: typography.fontSize.xs, lineHeight: typography.lineHeight.xs },
   section: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.md },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  sectionIcon: { width: 42, height: 42, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   sectionHeadingCopy: { flex: 1, gap: 2 },
   sectionTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.md },
   sectionSubtitle: { fontFamily: typography.fontFamily.body, fontSize: 10 },
@@ -431,18 +429,15 @@ const styles = StyleSheet.create({
   instructionsTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.md },
   instructions: { fontFamily: typography.fontFamily.bodyMedium, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm },
   stageBlock: { gap: spacing.md, paddingTop: spacing.sm },
-  stageHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  stageNumber: { width: 36, fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.xl },
-  stageHeadingCopy: { flex: 1, gap: 1 },
+  stageHeading: { gap: 1 },
   stageTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg },
   stageSubtitle: { fontFamily: typography.fontFamily.body, fontSize: typography.fontSize.xs },
   notesInput: { minHeight: 112, paddingTop: spacing.sm, paddingBottom: spacing.sm },
   characterCount: { marginTop: -spacing.md, fontFamily: typography.fontFamily.bodyMedium, fontSize: 10, textAlign: 'right' },
   actionSection: { marginTop: spacing.sm, gap: spacing.md, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
-  actionHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  actionIcon: { width: 42, height: 42, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
   actionCopy: { flex: 1, gap: 2 },
   actionTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg },
+  actionDescription: { fontFamily: typography.fontFamily.body, fontSize: typography.fontSize.xs, lineHeight: typography.lineHeight.xs },
   primaryAction: { minHeight: 54, borderRadius: radius.lg },
   actionHint: { fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.xs, textAlign: 'center' },
   actionError: { fontFamily: typography.fontFamily.bodyMedium, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm, textAlign: 'center' },
