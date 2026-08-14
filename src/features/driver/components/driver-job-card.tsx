@@ -1,22 +1,103 @@
-import { AppIcon } from '@/components/ui/app-icon';
-import { Card } from '@/components/ui/card';
-import { semanticColors, spacing, typography } from '@/shared/theme';
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 
+import { brandColors, radius, semanticColors, spacing, typography } from '@/shared/theme';
+
+import { formatDriverScheduleSummary, formatDriverWeight, formatDriverVehicle } from '../driver-job-formatters';
 import { DriverJob } from '../types';
-import { formatDriverScheduleSummary, formatDriverStatus, formatDriverWeight } from '../driver-job-formatters';
+import { DriverStatusPill } from './driver-status-pill';
 
-export function DriverJobCard({ job, onPress }: { job: DriverJob; onPress: () => void }) {
+export function DriverJobCard({
+  job,
+  onPress,
+  prominent = false,
+}: {
+  job: DriverJob;
+  onPress: () => void;
+  prominent?: boolean;
+}) {
   const colors = semanticColors[useColorScheme() === 'dark' ? 'dark' : 'light'];
-  return <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`Open job for ${job.customerName}`}>
-    <Card style={styles.card}>
-      <View style={styles.top}><Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{job.customerName}</Text><Text style={[styles.status, { color: colors.accent }]}>{formatDriverStatus(job.executionStatus)}</Text></View>
-      <View style={styles.row}><AppIcon name="calendar-outline" /><Text style={[styles.detail, { color: colors.textMuted }]}>{formatDriverScheduleSummary(job.scheduledAt)}</Text></View>
-      <View style={styles.row}><AppIcon name="location-outline" /><Text style={[styles.detail, { color: colors.textMuted }]} numberOfLines={2}>{job.pickupAddress}</Text></View>
-      <View style={styles.bottom}><Text style={[styles.meta, { color: colors.textMuted }]}>{job.materialType}{job.estimatedWeight != null ? ` | ${formatDriverWeight(job.estimatedWeight)}` : ''}</Text><Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>{job.assignment.vehicle.label}</Text><AppIcon name="chevron-forward" variant="brand" /></View>
-    </Card>
-  </Pressable>;
+  const completed = job.executionStatus === 'delivered_to_yard';
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Open job for ${job.customerName}`}
+      style={({ pressed }) => [
+        styles.card,
+        prominent && styles.prominentCard,
+        {
+          backgroundColor: colors.surface,
+          borderColor: prominent ? brandColors.copper : colors.border,
+          opacity: pressed ? 0.82 : completed ? 0.78 : 1,
+        },
+        Platform.OS === 'android' && styles.androidShadow,
+      ]}
+    >
+      <View style={[styles.accent, { backgroundColor: completed ? colors.border : prominent ? brandColors.copper : brandColors.navy }]} />
+      <View style={styles.content}>
+        <View style={styles.topRow}>
+          <View style={styles.titleBlock}>
+            <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{job.customerName}</Text>
+            <Text style={[styles.schedule, { color: colors.textMuted }]}>{formatDriverScheduleSummary(job.scheduledAt)}</Text>
+          </View>
+          <DriverStatusPill status={job.executionStatus} />
+        </View>
+
+        <View style={styles.addressRow}>
+          <View style={[styles.iconDisc, { backgroundColor: colors.background }]}>
+            <Ionicons name="location" size={16} color={colors.accent} />
+          </View>
+          <Text style={[styles.address, { color: colors.text }]} numberOfLines={2}>{job.pickupAddress}</Text>
+        </View>
+
+        <View style={[styles.metaRow, { borderTopColor: colors.border }]}>
+          <Meta icon="cube-outline" value={job.materialType} colors={colors} />
+          <Meta icon="scale-outline" value={formatDriverWeight(job.estimatedWeight)} colors={colors} />
+          <Meta icon="car-outline" value={formatDriverVehicle(job.assignment.vehicle)} colors={colors} grow />
+          <Ionicons name="chevron-forward" size={19} color={colors.accent} />
+        </View>
+      </View>
+    </Pressable>
+  );
 }
 
-const styles = StyleSheet.create({ card: { gap: spacing.sm }, top: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }, name: { flex: 1, fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.md }, status: { fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.xs }, row: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }, detail: { flex: 1, fontFamily: typography.fontFamily.body, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm }, bottom: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, meta: { flex: 1, fontFamily: typography.fontFamily.bodyMedium, fontSize: typography.fontSize.xs } });
+function Meta({ icon, value, colors, grow = false }: { icon: 'cube-outline' | 'scale-outline' | 'car-outline'; value: string; colors: (typeof semanticColors)[keyof typeof semanticColors]; grow?: boolean }) {
+  return (
+    <View style={[styles.meta, grow && styles.metaGrow]}>
+      <Ionicons name={icon} size={14} color={colors.textMuted} />
+      <Text style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={1}>{value}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    minHeight: 176,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderRadius: radius.xl,
+    shadowColor: brandColors.navy,
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+  },
+  prominentCard: { borderWidth: 1.25 },
+  androidShadow: { elevation: 2 },
+  accent: { width: 5 },
+  content: { flex: 1, padding: spacing.md, gap: spacing.md },
+  topRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  titleBlock: { flex: 1, gap: 3 },
+  name: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg, lineHeight: typography.lineHeight.lg },
+  schedule: { fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.xs },
+  addressRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  iconDisc: { width: 32, height: 32, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
+  address: { flex: 1, fontFamily: typography.fontFamily.bodyMedium, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm },
+  metaRow: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: spacing.sm },
+  meta: { maxWidth: 92, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaGrow: { flex: 1, maxWidth: undefined },
+  metaText: { flexShrink: 1, fontFamily: typography.fontFamily.bodyMedium, fontSize: 10 },
+});

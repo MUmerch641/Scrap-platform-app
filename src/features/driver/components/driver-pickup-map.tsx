@@ -308,15 +308,23 @@ export function DriverPickupMap({
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.headingRow}>
+        <View style={[styles.headingIcon, { backgroundColor: colors.background }]}>
+          <Ionicons name="navigate-circle-outline" size={23} color={colors.accent} />
+        </View>
         <View style={styles.headingCopy}>
-          <Text style={[styles.title, { color: colors.text }]}>Pickup Route</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>Traffic-aware driving route</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Pickup map</Text>
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>Location and traffic-aware route</Text>
         </View>
         {isQaCoordinate ? (
           <View style={[styles.qaBadge, { backgroundColor: colors.surfaceSelected }]}>
             <Text style={[styles.qaBadgeText, { color: colors.onPrimary }]}>QA PIN</Text>
           </View>
         ) : null}
+      </View>
+
+      <View style={[styles.addressBar, { backgroundColor: colors.background }]}>
+        <Ionicons name="location" size={17} color={colors.accent} />
+        <Text style={[styles.addressText, { color: colors.text }]} numberOfLines={2}>{pickupAddress}</Text>
       </View>
 
       <View style={[styles.mapFrame, { backgroundColor: colors.background, borderColor: colors.border }]}>
@@ -704,7 +712,7 @@ function MapControl({
 const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     padding: spacing.md,
     gap: spacing.md,
   },
@@ -715,6 +723,13 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   headingCopy: { flex: 1, gap: 2 },
+  headingIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: {
     fontFamily: typography.fontFamily.headingSemibold,
     fontSize: typography.fontSize.md,
@@ -733,10 +748,24 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.7,
   },
-  mapFrame: {
-    height: 292,
-    overflow: 'hidden',
+  addressBar: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
     borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+  },
+  addressText: {
+    flex: 1,
+    fontFamily: typography.fontFamily.bodySemibold,
+    fontSize: typography.fontSize.xs,
+    lineHeight: typography.lineHeight.xs,
+  },
+  mapFrame: {
+    height: 300,
+    overflow: 'hidden',
+    borderRadius: radius.xl,
     borderWidth: 1,
   },
   mapState: {

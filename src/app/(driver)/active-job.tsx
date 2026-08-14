@@ -10,7 +10,9 @@ import { ScreenScaffold } from '@/components/ui/screen-scaffold';
 import { useNetworkStatus } from '@/context/NetworkStatusContext';
 import { DriverJob, DriverJobPhoto, DriverJobPhotoType, PendingDriverJobPhoto } from '@/features/driver/types';
 import { DriverJobPhotoSection } from '@/features/driver/components/driver-job-photo-section';
+import { DriverJobProgress } from '@/features/driver/components/driver-job-progress';
 import { DriverPickupMap } from '@/features/driver/components/driver-pickup-map';
+import { DriverStatusPill } from '@/features/driver/components/driver-status-pill';
 import { fetchDriverJobPhotos, uploadDriverJobPhoto, validatePendingDriverPhoto } from '@/features/driver/services/driver-job-photo-service';
 import { getQaPickupCoordinate } from '@/features/driver/services/driver-location-service';
 import {
@@ -22,7 +24,8 @@ import {
 import { notifyDriverJobsChanged, subscribeToDriverJobsChanged } from '@/features/driver/services/driver-job-refresh';
 import { formatDriverSchedule, formatDriverStatus, formatDriverVehicle, formatDriverWeight } from '@/features/driver/driver-job-formatters';
 import { showErrorMessage, showNativeConfirmation, showSuccessMessage } from '@/services/native-feedback-service';
-import { semanticColors, spacing, typography } from '@/shared/theme';
+import { brandColors, radius, semanticColors, spacing, typography } from '@/shared/theme';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
@@ -297,21 +300,161 @@ export default function DriverActiveJobScreen() {
   const nextAction = NEXT_ACTIONS[job.executionStatus];
   const qaPickupCoordinate = job.pickupCoordinate ? null : getQaPickupCoordinate();
   const pickupCoordinate = job.pickupCoordinate ?? qaPickupCoordinate;
-  return <ScreenScaffold mode="form" header={<AppHeader title="Job Details" subtitle={formatDriverStatus(job.executionStatus)} />} contentContainerStyle={styles.content} androidKeyboardAvoidance>
-    <Section title="Customer" colors={colors}><Text style={[styles.customerName, { color: colors.text }]}>{job.customerName}</Text><Detail label="Phone" value={job.customerPhone} colors={colors} />{job.customerPhone.replace(/[^\d+]/g, '') ? <Button title="Call Customer" variant="outline" onPress={() => void callCustomer()} /> : null}</Section>
-    <Section title="Pickup" colors={colors}><Detail label="Historical pickup address" value={job.pickupAddress} colors={colors} /><Detail label="Scheduled date" value={schedule.date} colors={colors} /><Detail label="Scheduled time" value={schedule.time} colors={colors} /><Detail label="Material" value={job.materialType} colors={colors} /><Detail label="Estimated weight" value={formatDriverWeight(job.estimatedWeight)} colors={colors} /></Section>
-    <DriverPickupMap key={job.id} pickupJobId={job.id} pickupAddress={job.pickupAddress} pickupCoordinate={pickupCoordinate} isQaCoordinate={Boolean(qaPickupCoordinate)} />
-    <Section title="Assignment" colors={colors}><Detail label="Vehicle" value={formatDriverVehicle(job.assignment.vehicle)} colors={colors} /><Detail label="Current status" value={formatDriverStatus(job.executionStatus)} colors={colors} />{job.deliveredToYardAt ? <Detail label="Delivered to yard" value={`${formatDriverSchedule(job.deliveredToYardAt).date} at ${formatDriverSchedule(job.deliveredToYardAt).time}`} colors={colors} /> : null}</Section>
-    {job.pickupNotes ? <Section title="Pickup Instructions" colors={colors}><Text style={[styles.instructions, { color: colors.text }]}>{job.pickupNotes}</Text></Section> : null}
-    {job.executionStatus === 'arrived' ? <Section title="Collection Details" colors={colors}><Detail label="Estimated Weight" value={formatDriverWeight(job.estimatedWeight)} colors={colors} /><FormInput label="Actual Collected Weight (kg)" value={actualWeightInput} onChangeText={(value) => { setActualWeightInput(value); setActualWeightError(undefined); }} keyboardType="decimal-pad" returnKeyType="done" placeholder="Enter actual weight" error={actualWeightError} /><FormInput label="Driver Notes (Optional)" value={driverNotesInput} onChangeText={(value) => { setDriverNotesInput(value); setDriverNotesError(undefined); }} multiline numberOfLines={4} textAlignVertical="top" maxLength={1000} placeholder="Add collection details" error={driverNotesError} style={styles.notesInput} /><Text style={[styles.characterCount, { color: colors.textMuted }]}>{driverNotesInput.length}/1000</Text></Section> : null}
-    {job.executionStatus === 'material_collected' || job.executionStatus === 'delivered_to_yard' ? <Section title="Collection Details" colors={colors}><Detail label="Actual Collected Weight" value={formatDriverWeight(job.actualCollectedWeight)} colors={colors} /><Detail label="Driver Notes" value={job.driverNotes ?? 'No driver notes'} colors={colors} /></Section> : null}
-    {['arrived', 'material_collected', 'delivered_to_yard'].includes(job.executionStatus) ? <DriverJobPhotoSection title="Collection Photos" photoType="collection" photos={photos} pending={pendingPhotos} canAdd={job.executionStatus !== 'delivered_to_yard'} onTakePhoto={() => void selectPhoto('collection', 'camera')} onChoosePhoto={() => void selectPhoto('collection', 'library')} onRetry={(photo) => void uploadSelectedPhoto(photo)} onPreview={(uri, label) => setPhotoPreview({ uri, label })} /> : null}
-    {['material_collected', 'delivered_to_yard'].includes(job.executionStatus) ? <DriverJobPhotoSection title="Delivery Photos" photoType="delivery" photos={photos} pending={pendingPhotos} canAdd={job.executionStatus === 'material_collected'} onTakePhoto={() => void selectPhoto('delivery', 'camera')} onChoosePhoto={() => void selectPhoto('delivery', 'library')} onRetry={(photo) => void uploadSelectedPhoto(photo)} onPreview={(uri, label) => setPhotoPreview({ uri, label })} /> : null}
-    {nextAction ? <View style={styles.actionSection}><Button title={nextAction.title} onPress={confirmTransition} loading={transitioning} disabled={isOffline} />{transitionError ? <Text style={[styles.actionError, { color: colors.danger }]}>{transitionError}</Text> : null}</View> : <View style={[styles.completedState, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={[styles.completedTitle, { color: colors.text }]}>Driver execution complete</Text><Text style={[styles.completedMessage, { color: colors.textMuted }]}>This job was delivered to the yard and no further Driver action is needed.</Text></View>}
-    <Modal visible={Boolean(photoPreview)} transparent animationType="fade" onRequestClose={() => setPhotoPreview(null)}><Pressable style={styles.previewBackdrop} onPress={() => setPhotoPreview(null)}><Pressable style={[styles.previewCard, { backgroundColor: colors.surface }]} onPress={() => undefined}><Text style={[styles.previewTitle, { color: colors.text }]}>{photoPreview?.label}</Text>{photoPreview ? <Image source={{ uri: photoPreview.uri }} style={styles.previewImage} contentFit="contain" /> : null}<Button title="Close" variant="outline" onPress={() => setPhotoPreview(null)} /></Pressable></Pressable></Modal>
-  </ScreenScaffold>;
+  return (
+    <ScreenScaffold mode="form" header={<AppHeader title="Active Job" subtitle={job.customerName} />} contentContainerStyle={styles.content} androidKeyboardAvoidance>
+      <View style={styles.overviewHero}>
+        <View style={styles.overviewTop}>
+          <Text style={styles.overviewEyebrow}>PICKUP JOB</Text>
+          <DriverStatusPill status={job.executionStatus} inverse />
+        </View>
+        <Text style={styles.customerName}>{job.customerName}</Text>
+        <View style={styles.heroDetail}><Ionicons name="time-outline" size={17} color={brandColors.lightCopper} /><Text style={styles.heroDetailText}>{schedule.time} · {schedule.date}</Text></View>
+        <View style={styles.heroDetail}><Ionicons name="location-outline" size={17} color={brandColors.lightCopper} /><Text style={styles.heroDetailText} numberOfLines={2}>{job.pickupAddress}</Text></View>
+        <View style={styles.heroMetaRow}>
+          <HeroMeta label="Material" value={job.materialType} />
+          <View style={styles.heroMetaDivider} />
+          <HeroMeta label="Est. weight" value={formatDriverWeight(job.estimatedWeight)} />
+          <View style={styles.heroMetaDivider} />
+          <HeroMeta label="Vehicle" value={job.assignment.vehicle.label} />
+        </View>
+      </View>
+
+      <DriverJobProgress status={job.executionStatus} />
+
+      {nextAction ? (
+        <View style={[styles.nextStepBanner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.nextStepIcon, { backgroundColor: colors.background }]}><Ionicons name="arrow-forward" size={19} color={colors.accent} /></View>
+          <View style={styles.nextStepCopy}><Text style={[styles.smallEyebrow, { color: colors.accent }]}>YOUR NEXT STEP</Text><Text style={[styles.nextStepTitle, { color: colors.text }]}>{nextAction.title}</Text><Text style={[styles.nextStepText, { color: colors.textMuted }]}>{nextStepDescription(job.executionStatus)}</Text></View>
+        </View>
+      ) : null}
+
+      <DriverPickupMap key={job.id} pickupJobId={job.id} pickupAddress={job.pickupAddress} pickupCoordinate={pickupCoordinate} isQaCoordinate={Boolean(qaPickupCoordinate)} />
+
+      <OperationalSection title="Job information" subtitle="Customer, material and assignment" icon="clipboard-outline" colors={colors}>
+        <View style={styles.infoGrid}>
+          <InfoItem icon="call-outline" label="Customer phone" value={job.customerPhone} colors={colors} />
+          <InfoItem icon="cube-outline" label="Material" value={job.materialType} colors={colors} />
+          <InfoItem icon="scale-outline" label="Estimated weight" value={formatDriverWeight(job.estimatedWeight)} colors={colors} />
+          <InfoItem icon="car-outline" label="Assigned vehicle" value={formatDriverVehicle(job.assignment.vehicle)} colors={colors} />
+        </View>
+        {job.customerPhone.replace(/[^\d+]/g, '') ? <Button title="Call Customer" variant="outline" onPress={() => void callCustomer()} style={styles.secondaryButton} /> : null}
+        {job.deliveredToYardAt ? <InfoItem icon="checkmark-done-outline" label="Delivered to yard" value={`${formatDriverSchedule(job.deliveredToYardAt).date} at ${formatDriverSchedule(job.deliveredToYardAt).time}`} colors={colors} /> : null}
+      </OperationalSection>
+
+      {job.pickupNotes ? (
+        <View style={[styles.instructionsCard, { backgroundColor: colors.surface, borderColor: brandColors.lightCopper }]}>
+          <View style={styles.instructionsHeading}><Ionicons name="information-circle" size={21} color={colors.accent} /><Text style={[styles.instructionsTitle, { color: colors.text }]}>Pickup instructions</Text></View>
+          <Text style={[styles.instructions, { color: colors.text }]}>{job.pickupNotes}</Text>
+        </View>
+      ) : null}
+
+      {['arrived', 'material_collected', 'delivered_to_yard'].includes(job.executionStatus) ? (
+        <View style={styles.stageBlock}>
+          <StageHeading number="01" title="Photo evidence" subtitle="Capture a clear record of the pickup" colors={colors} />
+          <DriverJobPhotoSection title="Collection Photos" photoType="collection" photos={photos} pending={pendingPhotos} canAdd={job.executionStatus !== 'delivered_to_yard'} onTakePhoto={() => void selectPhoto('collection', 'camera')} onChoosePhoto={() => void selectPhoto('collection', 'library')} onRetry={(photo) => void uploadSelectedPhoto(photo)} onPreview={(uri, label) => setPhotoPreview({ uri, label })} />
+          {['material_collected', 'delivered_to_yard'].includes(job.executionStatus) ? <DriverJobPhotoSection title="Delivery Photos" photoType="delivery" photos={photos} pending={pendingPhotos} canAdd={job.executionStatus === 'material_collected'} onTakePhoto={() => void selectPhoto('delivery', 'camera')} onChoosePhoto={() => void selectPhoto('delivery', 'library')} onRetry={(photo) => void uploadSelectedPhoto(photo)} onPreview={(uri, label) => setPhotoPreview({ uri, label })} /> : null}
+        </View>
+      ) : null}
+
+      {job.executionStatus === 'arrived' ? (
+        <View style={styles.stageBlock}>
+          <StageHeading number="02" title="Material collection" subtitle="Record the verified load before continuing" colors={colors} />
+          <OperationalSection title="Collection details" subtitle={`Estimated ${formatDriverWeight(job.estimatedWeight)}`} icon="scale-outline" colors={colors}>
+            <FormInput label="Actual collected weight (kg)" value={actualWeightInput} onChangeText={(value) => { setActualWeightInput(value); setActualWeightError(undefined); }} keyboardType="decimal-pad" returnKeyType="done" showDoneAccessory placeholder="Enter verified weight" error={actualWeightError} />
+            <FormInput label="Driver notes (optional)" value={driverNotesInput} onChangeText={(value) => { setDriverNotesInput(value); setDriverNotesError(undefined); }} multiline numberOfLines={4} textAlignVertical="top" maxLength={1000} showDoneAccessory placeholder="Condition, access details, or collection notes" error={driverNotesError} style={styles.notesInput} />
+            <Text style={[styles.characterCount, { color: colors.textMuted }]}>{driverNotesInput.length}/1000</Text>
+          </OperationalSection>
+        </View>
+      ) : null}
+
+      {job.executionStatus === 'material_collected' || job.executionStatus === 'delivered_to_yard' ? (
+        <OperationalSection title="Collected material" subtitle="Recorded at pickup" icon="checkmark-circle-outline" colors={colors}>
+          <InfoItem icon="scale-outline" label="Actual collected weight" value={formatDriverWeight(job.actualCollectedWeight)} colors={colors} />
+          <InfoItem icon="document-text-outline" label="Driver notes" value={job.driverNotes ?? 'No driver notes'} colors={colors} />
+        </OperationalSection>
+      ) : null}
+
+      {nextAction ? (
+        <View style={[styles.actionSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.actionHeading}><View style={[styles.actionIcon, { backgroundColor: colors.background }]}><Ionicons name="flag-outline" size={20} color={colors.accent} /></View><View style={styles.actionCopy}><Text style={[styles.smallEyebrow, { color: colors.accent }]}>READY TO CONTINUE?</Text><Text style={[styles.actionTitle, { color: colors.text }]}>{nextAction.title}</Text></View></View>
+          <Button title={nextAction.title} onPress={confirmTransition} loading={transitioning} disabled={isOffline} style={styles.primaryAction} />
+          {isOffline ? <Text style={[styles.actionHint, { color: colors.warning }]}>Reconnect before changing job status.</Text> : null}
+          {transitionError ? <Text style={[styles.actionError, { color: colors.danger }]}>{transitionError}</Text> : null}
+        </View>
+      ) : (
+        <View style={[styles.completedState, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={[styles.completedIcon, { backgroundColor: colors.background }]}><Ionicons name="checkmark-done" size={26} color={colors.success} /></View><View style={styles.completedCopy}><Text style={[styles.completedTitle, { color: colors.text }]}>Job complete</Text><Text style={[styles.completedMessage, { color: colors.textMuted }]}>Material was delivered to the yard. No further Driver action is required.</Text></View></View>
+      )}
+
+      <Modal visible={Boolean(photoPreview)} transparent animationType="fade" onRequestClose={() => setPhotoPreview(null)}><Pressable style={styles.previewBackdrop} onPress={() => setPhotoPreview(null)}><Pressable style={[styles.previewCard, { backgroundColor: colors.surface }]} onPress={() => undefined}><View style={styles.previewHeading}><Text style={[styles.previewTitle, { color: colors.text }]}>{photoPreview?.label}</Text><Pressable onPress={() => setPhotoPreview(null)} accessibilityRole="button" accessibilityLabel="Close photo preview" style={[styles.previewClose, { backgroundColor: colors.background }]}><Ionicons name="close" size={22} color={colors.text} /></Pressable></View>{photoPreview ? <Image source={{ uri: photoPreview.uri }} style={styles.previewImage} contentFit="contain" /> : null}</Pressable></Pressable></Modal>
+    </ScreenScaffold>
+  );
 }
 
-function Section({ title, colors, children }: { title: string; colors: (typeof semanticColors)[keyof typeof semanticColors]; children: React.ReactNode }) { return <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>{children}</View>; }
-function Detail({ label, value, colors }: { label: string; value: string; colors: (typeof semanticColors)[keyof typeof semanticColors] }) { return <View style={styles.detail}><Text style={[styles.label, { color: colors.textMuted }]}>{label}</Text><Text style={[styles.value, { color: colors.text }]}>{value}</Text></View>; }
-const styles = StyleSheet.create({ content: { gap: spacing.md }, section: { borderWidth: 1, borderRadius: 12, padding: spacing.md, gap: spacing.md }, sectionTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.md }, customerName: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.xl }, detail: { gap: spacing.xs }, label: { fontFamily: typography.fontFamily.bodyMedium, fontSize: typography.fontSize.xs }, value: { fontFamily: typography.fontFamily.body, fontSize: typography.fontSize.md, lineHeight: typography.lineHeight.md }, instructions: { fontFamily: typography.fontFamily.body, fontSize: typography.fontSize.md, lineHeight: typography.lineHeight.md }, notesInput: { minHeight: 96, paddingTop: spacing.sm, paddingBottom: spacing.sm }, characterCount: { marginTop: -spacing.sm, fontFamily: typography.fontFamily.body, fontSize: typography.fontSize.xs, textAlign: 'right' }, actionSection: { gap: spacing.sm }, actionError: { fontFamily: typography.fontFamily.bodyMedium, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm, textAlign: 'center' }, completedState: { borderWidth: 1, borderRadius: 12, padding: spacing.md, gap: spacing.xs }, completedTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.md }, completedMessage: { fontFamily: typography.fontFamily.body, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm }, previewBackdrop: { flex: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(0, 0, 0, 0.6)' }, previewCard: { maxHeight: '86%', borderRadius: 12, padding: spacing.md, gap: spacing.md }, previewTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.md }, previewImage: { width: '100%', aspectRatio: 1 } });
+function nextStepDescription(status: DriverJob['executionStatus']): string { if (status === 'assigned') return 'Review the pickup and begin driving when ready.'; if (status === 'en_route') return 'Mark your arrival once you are safely at the pickup.'; if (status === 'arrived') return 'Add evidence and record the collected material.'; return 'Complete delivery after reaching the yard.'; }
+function HeroMeta({ label, value }: { label: string; value: string }) { return <View style={styles.heroMeta}><Text style={styles.heroMetaLabel}>{label}</Text><Text style={styles.heroMetaValue} numberOfLines={1}>{value}</Text></View>; }
+function OperationalSection({ title, subtitle, icon, colors, children }: { title: string; subtitle: string; icon: React.ComponentProps<typeof Ionicons>['name']; colors: (typeof semanticColors)[keyof typeof semanticColors]; children: React.ReactNode }) { return <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={styles.sectionHeading}><View style={[styles.sectionIcon, { backgroundColor: colors.background }]}><Ionicons name={icon} size={20} color={colors.accent} /></View><View style={styles.sectionHeadingCopy}><Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>{subtitle}</Text></View></View>{children}</View>; }
+function InfoItem({ icon, label, value, colors }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; value: string; colors: (typeof semanticColors)[keyof typeof semanticColors] }) { return <View style={styles.infoItem}><Ionicons name={icon} size={17} color={colors.accent} /><View style={styles.infoCopy}><Text style={[styles.infoLabel, { color: colors.textMuted }]}>{label}</Text><Text style={[styles.infoValue, { color: colors.text }]}>{value}</Text></View></View>; }
+function StageHeading({ number, title, subtitle, colors }: { number: string; title: string; subtitle: string; colors: (typeof semanticColors)[keyof typeof semanticColors] }) { return <View style={styles.stageHeading}><Text style={[styles.stageNumber, { color: colors.accent }]}>{number}</Text><View style={styles.stageHeadingCopy}><Text style={[styles.stageTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.stageSubtitle, { color: colors.textMuted }]}>{subtitle}</Text></View></View>; }
+const styles = StyleSheet.create({
+  content: { gap: spacing.md, paddingTop: spacing.md },
+  overviewHero: { marginHorizontal: -spacing.md, marginTop: -spacing.md, padding: spacing.lg, gap: spacing.sm, backgroundColor: brandColors.navy, borderBottomLeftRadius: radius.xl, borderBottomRightRadius: radius.xl },
+  overviewTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  overviewEyebrow: { color: brandColors.lightCopper, fontFamily: typography.fontFamily.bodyBold, fontSize: 10, letterSpacing: 1.2 },
+  customerName: { color: brandColors.white, fontFamily: typography.fontFamily.headingSemibold, fontSize: 28, lineHeight: 32 },
+  heroDetail: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  heroDetailText: { flex: 1, color: 'rgba(251,252,248,0.84)', fontFamily: typography.fontFamily.bodyMedium, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm },
+  heroMetaRow: { minHeight: 60, flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: radius.lg, backgroundColor: 'rgba(251,252,248,0.09)' },
+  heroMeta: { flex: 1, gap: 3 },
+  heroMetaLabel: { color: 'rgba(251,252,248,0.60)', fontFamily: typography.fontFamily.bodyMedium, fontSize: 9 },
+  heroMetaValue: { color: brandColors.white, fontFamily: typography.fontFamily.bodyBold, fontSize: 11 },
+  heroMetaDivider: { width: StyleSheet.hairlineWidth, height: 30, marginHorizontal: spacing.sm, backgroundColor: 'rgba(251,252,248,0.18)' },
+  nextStepBanner: { minHeight: 80, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
+  nextStepIcon: { width: 44, height: 44, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
+  nextStepCopy: { flex: 1, gap: 2 },
+  smallEyebrow: { fontFamily: typography.fontFamily.bodyBold, fontSize: 9, letterSpacing: 1 },
+  nextStepTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.md },
+  nextStepText: { fontFamily: typography.fontFamily.body, fontSize: typography.fontSize.xs, lineHeight: typography.lineHeight.xs },
+  section: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.md },
+  sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  sectionIcon: { width: 42, height: 42, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
+  sectionHeadingCopy: { flex: 1, gap: 2 },
+  sectionTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.md },
+  sectionSubtitle: { fontFamily: typography.fontFamily.body, fontSize: 10 },
+  infoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  infoItem: { width: '46%', minWidth: 126, flexGrow: 1, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  infoCopy: { flex: 1, gap: 2 },
+  infoLabel: { fontFamily: typography.fontFamily.bodyMedium, fontSize: 10 },
+  infoValue: { fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm },
+  secondaryButton: { minHeight: 46, borderRadius: radius.lg },
+  instructionsCard: { borderLeftWidth: 4, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
+  instructionsHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  instructionsTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.md },
+  instructions: { fontFamily: typography.fontFamily.bodyMedium, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm },
+  stageBlock: { gap: spacing.md, paddingTop: spacing.sm },
+  stageHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  stageNumber: { width: 36, fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.xl },
+  stageHeadingCopy: { flex: 1, gap: 1 },
+  stageTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg },
+  stageSubtitle: { fontFamily: typography.fontFamily.body, fontSize: typography.fontSize.xs },
+  notesInput: { minHeight: 112, paddingTop: spacing.sm, paddingBottom: spacing.sm },
+  characterCount: { marginTop: -spacing.md, fontFamily: typography.fontFamily.bodyMedium, fontSize: 10, textAlign: 'right' },
+  actionSection: { marginTop: spacing.sm, gap: spacing.md, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
+  actionHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  actionIcon: { width: 42, height: 42, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
+  actionCopy: { flex: 1, gap: 2 },
+  actionTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg },
+  primaryAction: { minHeight: 54, borderRadius: radius.lg },
+  actionHint: { fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.xs, textAlign: 'center' },
+  actionError: { fontFamily: typography.fontFamily.bodyMedium, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm, textAlign: 'center' },
+  completedState: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg },
+  completedIcon: { width: 50, height: 50, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
+  completedCopy: { flex: 1, gap: spacing.xs },
+  completedTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg },
+  completedMessage: { fontFamily: typography.fontFamily.body, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm },
+  previewBackdrop: { flex: 1, justifyContent: 'center', padding: spacing.md, backgroundColor: 'rgba(0, 0, 0, 0.76)' },
+  previewCard: { maxHeight: '92%', borderRadius: radius.xl, padding: spacing.md, gap: spacing.md },
+  previewHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  previewTitle: { flex: 1, fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg },
+  previewClose: { width: 40, height: 40, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
+  previewImage: { width: '100%', aspectRatio: 0.82 },
+});

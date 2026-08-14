@@ -1,28 +1,138 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import React from 'react';
-import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+
+import { brandColors, radius, semanticColors, spacing, typography } from '@/shared/theme';
 
 import { DriverJobPhoto, DriverJobPhotoType, PendingDriverJobPhoto } from '../types';
-import { semanticColors, spacing, typography } from '@/shared/theme';
 
-interface Props { title: string; photoType: DriverJobPhotoType; photos: DriverJobPhoto[]; pending: PendingDriverJobPhoto[]; canAdd: boolean; onTakePhoto: () => void; onChoosePhoto: () => void; onRetry: (photo: PendingDriverJobPhoto) => void; onPreview: (uri: string, label: string) => void; }
+interface Props {
+  title: string;
+  photoType: DriverJobPhotoType;
+  photos: DriverJobPhoto[];
+  pending: PendingDriverJobPhoto[];
+  canAdd: boolean;
+  onTakePhoto: () => void;
+  onChoosePhoto: () => void;
+  onRetry: (photo: PendingDriverJobPhoto) => void;
+  onPreview: (uri: string, label: string) => void;
+}
 
 export function DriverJobPhotoSection({ title, photoType, photos, pending, canAdd, onTakePhoto, onChoosePhoto, onRetry, onPreview }: Props) {
   const colors = semanticColors[useColorScheme() === 'dark' ? 'dark' : 'light'];
   const categoryPhotos = photos.filter((photo) => photo.photoType === photoType);
   const categoryPending = pending.filter((photo) => photo.photoType === photoType);
-  return <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-    <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-    {canAdd ? <View style={styles.actions}><PhotoAction label="Take Photo" icon="camera-outline" color={colors.accent} onPress={onTakePhoto} accessibilityLabel={`Take ${photoType} photo`} /><PhotoAction label="Choose from Library" icon="images-outline" color={colors.accent} onPress={onChoosePhoto} accessibilityLabel={`Choose ${photoType} photo from library`} /></View> : null}
-    {!canAdd && categoryPhotos.length === 0 ? <Text style={[styles.empty, { color: colors.textMuted }]}>No photos recorded.</Text> : null}
-    {(categoryPhotos.length > 0 || categoryPending.length > 0) ? <View style={styles.grid}>
-      {categoryPhotos.map((photo, index) => <PhotoTile key={photo.id} uri={photo.signedUrl} label={`${title.slice(0, -1)} ${index + 1}`} status="Uploaded" onPress={() => photo.signedUrl && onPreview(photo.signedUrl, `${title.slice(0, -1)} ${index + 1}`)} colors={colors} />)}
-      {categoryPending.map((photo, index) => <PhotoTile key={photo.id} uri={photo.uri} label={`${title.slice(0, -1)} pending ${index + 1}`} status={photo.status === 'failed' ? 'Failed' : photo.status === 'uploading' ? 'Uploading' : 'Preparing'} onPress={photo.status === 'failed' ? () => onRetry(photo) : undefined} colors={colors} />)}
-    </View> : null}
-  </View>;
+  const hasEvidence = categoryPhotos.length > 0;
+
+  return (
+    <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={styles.headingRow}>
+        <View style={[styles.headingIcon, { backgroundColor: colors.background }]}>
+          <Ionicons name={photoType === 'collection' ? 'camera-outline' : 'business-outline'} size={20} color={colors.accent} />
+        </View>
+        <View style={styles.headingCopy}>
+          <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>{photoType === 'collection' ? 'Document material at pickup' : 'Confirm evidence at the yard'}</Text>
+        </View>
+        <View style={[styles.evidenceBadge, { backgroundColor: hasEvidence ? 'rgba(40,99,71,0.12)' : colors.background }]}>
+          <Ionicons name={hasEvidence ? 'checkmark-circle' : 'ellipse-outline'} size={14} color={hasEvidence ? colors.success : colors.textMuted} />
+          <Text style={[styles.evidenceText, { color: hasEvidence ? colors.success : colors.textMuted }]}>{hasEvidence ? `${categoryPhotos.length} added` : 'None yet'}</Text>
+        </View>
+      </View>
+
+      {canAdd ? (
+        <View style={styles.actions}>
+          <PhotoAction label="Take Photo" icon="camera" primary color={colors.primary} onPress={onTakePhoto} accessibilityLabel={`Take ${photoType} photo`} />
+          <PhotoAction label="Photo Library" icon="images-outline" color={colors.primary} onPress={onChoosePhoto} accessibilityLabel={`Choose ${photoType} photo from library`} />
+        </View>
+      ) : null}
+
+      {!canAdd && !hasEvidence ? (
+        <View style={[styles.empty, { backgroundColor: colors.background }]}>
+          <Ionicons name="image-outline" size={20} color={colors.textMuted} />
+          <Text style={[styles.emptyText, { color: colors.textMuted }]}>No evidence was recorded for this stage.</Text>
+        </View>
+      ) : null}
+
+      {hasEvidence || categoryPending.length > 0 ? (
+        <View style={styles.grid}>
+          {categoryPhotos.map((photo, index) => (
+            <PhotoTile
+              key={photo.id}
+              uri={photo.signedUrl}
+              label={`${title.slice(0, -1)} ${index + 1}`}
+              status="uploaded"
+              onPress={() => photo.signedUrl && onPreview(photo.signedUrl, `${title.slice(0, -1)} ${index + 1}`)}
+              colors={colors}
+            />
+          ))}
+          {categoryPending.map((photo, index) => (
+            <PhotoTile
+              key={photo.id}
+              uri={photo.uri}
+              label={`${title.slice(0, -1)} pending ${index + 1}`}
+              status={photo.status}
+              onPress={photo.status === 'failed' ? () => onRetry(photo) : undefined}
+              colors={colors}
+            />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
-function PhotoAction({ label, icon, color, onPress, accessibilityLabel }: { label: string; icon: 'camera-outline' | 'images-outline'; color: string; onPress: () => void; accessibilityLabel: string }) { return <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={accessibilityLabel} style={[styles.action, { borderColor: color }]}><Ionicons name={icon} size={18} color={color} /><Text style={[styles.actionText, { color }]}>{label}</Text></Pressable>; }
-function PhotoTile({ uri, label, status, onPress, colors }: { uri: string | null; label: string; status: string; onPress?: () => void; colors: (typeof semanticColors)[keyof typeof semanticColors] }) { return <Pressable onPress={onPress} disabled={!onPress} accessibilityRole="imagebutton" accessibilityLabel={`${label}, ${status}`} style={[styles.tile, { borderColor: colors.border, backgroundColor: colors.background }]}>{uri ? <Image source={{ uri }} style={styles.thumbnail} contentFit="cover" transition={120} /> : <Ionicons name="image-outline" size={24} color={colors.textMuted} />}<Text numberOfLines={1} style={[styles.status, { color: status === 'Failed' ? colors.danger : colors.textMuted }]}>{status === 'Failed' ? 'Retry' : status}</Text></Pressable>; }
-const styles = StyleSheet.create({ section: { borderWidth: 1, borderRadius: 12, padding: spacing.md, gap: spacing.sm }, title: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.md }, actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, action: { minHeight: 44, paddingHorizontal: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, borderWidth: 1, borderRadius: 8 }, actionText: { fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.sm }, grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, tile: { width: 88, minHeight: 104, borderWidth: 1, borderRadius: 8, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }, thumbnail: { width: 86, height: 78 }, status: { paddingHorizontal: spacing.xs, paddingVertical: spacing.xs, fontFamily: typography.fontFamily.bodyMedium, fontSize: typography.fontSize.xs }, empty: { fontFamily: typography.fontFamily.body, fontSize: typography.fontSize.sm } });
+function PhotoAction({ label, icon, primary = false, color, onPress, accessibilityLabel }: { label: string; icon: 'camera' | 'images-outline'; primary?: boolean; color: string; onPress: () => void; accessibilityLabel: string }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={({ pressed }) => [styles.action, { borderColor: color, backgroundColor: primary ? color : 'transparent', opacity: pressed ? 0.72 : 1 }]}
+    >
+      <Ionicons name={icon} size={18} color={primary ? brandColors.white : color} />
+      <Text style={[styles.actionText, { color: primary ? brandColors.white : color }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function PhotoTile({ uri, label, status, onPress, colors }: { uri: string | null; label: string; status: 'uploaded' | PendingDriverJobPhoto['status']; onPress?: () => void; colors: (typeof semanticColors)[keyof typeof semanticColors] }) {
+  const isFailed = status === 'failed';
+  const isPending = status === 'uploading' || status === 'preparing';
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      accessibilityRole="imagebutton"
+      accessibilityLabel={`${label}, ${isFailed ? 'upload failed, retry' : status}`}
+      style={({ pressed }) => [styles.tile, { borderColor: isFailed ? colors.danger : colors.border, backgroundColor: colors.background, opacity: pressed ? 0.78 : 1 }]}
+    >
+      {uri ? <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={120} /> : <Ionicons name="image-outline" size={26} color={colors.textMuted} />}
+      <View style={[styles.tileShade, isFailed && styles.failedShade]} />
+      {isPending ? <ActivityIndicator color={brandColors.white} /> : <Ionicons name={isFailed ? 'refresh-circle' : 'checkmark-circle'} size={24} color={isFailed ? brandColors.white : '#B9F5D2'} />}
+      <Text numberOfLines={1} style={styles.tileStatus}>{isFailed ? 'Tap to retry' : isPending ? 'Uploading' : 'Uploaded'}</Text>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  section: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.md },
+  headingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  headingIcon: { width: 42, height: 42, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
+  headingCopy: { flex: 1, gap: 2 },
+  title: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.md },
+  subtitle: { fontFamily: typography.fontFamily.body, fontSize: 10 },
+  evidenceBadge: { minHeight: 28, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.full, paddingHorizontal: spacing.sm },
+  evidenceText: { fontFamily: typography.fontFamily.bodyBold, fontSize: 10 },
+  actions: { flexDirection: 'row', gap: spacing.sm },
+  action: { minHeight: 46, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: spacing.sm },
+  actionText: { fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.xs },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  tile: { width: '30.8%', aspectRatio: 0.92, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, borderWidth: 1, borderRadius: radius.lg },
+  tileShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,45,69,0.34)' },
+  failedShade: { backgroundColor: 'rgba(127,29,29,0.66)' },
+  tileStatus: { color: brandColors.white, fontFamily: typography.fontFamily.bodyBold, fontSize: 9 },
+  empty: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderRadius: radius.lg, paddingHorizontal: spacing.md },
+  emptyText: { flex: 1, fontFamily: typography.fontFamily.bodyMedium, fontSize: typography.fontSize.xs },
+});
