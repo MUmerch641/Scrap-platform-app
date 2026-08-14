@@ -43,10 +43,7 @@ export default function DriverProfileScreen() {
         </View>
       </View>
 
-      <View>
-        <Text style={[styles.eyebrow, { color: colors.accent }]}>ACCOUNT DETAILS</Text>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Your profile</Text>
-      </View>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Account details</Text>
 
       <View style={[styles.detailsPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <ProfileRow icon="person-outline" label="Full name" value={displayName} colors={colors} />
@@ -82,14 +79,13 @@ const styles = StyleSheet.create({
   identityCopy: { flex: 1, gap: spacing.xs },
   name: { color: brandColors.white, fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg, lineHeight: typography.lineHeight.lg },
   rolePill: { alignSelf: 'flex-start', minHeight: 28, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.full, paddingHorizontal: spacing.sm, backgroundColor: 'rgba(251,252,248,0.10)' },
-  roleText: { color: brandColors.lightCopper, fontFamily: typography.fontFamily.bodyBold, fontSize: 9, letterSpacing: 0.8 },
-  eyebrow: { fontFamily: typography.fontFamily.bodyBold, fontSize: 10, letterSpacing: 1 },
+  roleText: { color: brandColors.lightCopper, fontFamily: typography.fontFamily.bodyBold, fontSize: 10, letterSpacing: 0.5 },
   sectionTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg },
   detailsPanel: { borderWidth: 1, borderRadius: radius.xl, paddingHorizontal: spacing.md },
   row: { minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
   rowIcon: { width: 40, height: 40, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   rowCopy: { flex: 1, gap: 3 },
-  rowLabel: { fontFamily: typography.fontFamily.bodyMedium, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
+  rowLabel: { fontFamily: typography.fontFamily.bodyMedium, fontSize: 11 },
   rowValue: { fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.md },
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 56 },
   securityNote: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },

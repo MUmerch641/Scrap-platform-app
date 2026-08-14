@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   },
   activeDot: { borderColor: brandColors.lightCopper, borderWidth: 4 },
   check: { color: brandColors.white, fontFamily: typography.fontFamily.bodyBold, fontSize: 11 },
-  stepLabel: { width: 62, textAlign: 'center', fontFamily: typography.fontFamily.bodyMedium, fontSize: 9 },
+  stepLabel: { width: 62, textAlign: 'center', fontFamily: typography.fontFamily.bodyMedium, fontSize: 10 },
   activeLabel: { fontFamily: typography.fontFamily.bodyBold },
   line: { flex: 1, height: 2, marginTop: 10, marginHorizontal: -5 },
 });

@@ -95,10 +95,7 @@ export default function DriverHomeScreen() {
       {primaryJob ? (
         <View style={styles.jobSection}>
           <View style={styles.sectionHeading}>
-            <View>
-              <Text style={[styles.eyebrow, { color: colors.accent }]}>{activeJob ? 'CURRENT JOB' : 'NEXT PICKUP'}</Text>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>{activeJob ? 'Continue where you left off' : 'Up next'}</Text>
-            </View>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{activeJob ? 'Current job' : 'Next pickup'}</Text>
           </View>
           <DriverJobCard job={primaryJob} prominent onPress={() => openJob(primaryJob)} />
           <View style={styles.nextStep}>
@@ -119,10 +116,7 @@ export default function DriverHomeScreen() {
       {nextJob && activeJob ? (
         <View style={styles.upNextSection}>
           <View style={styles.sectionHeading}>
-            <View>
-              <Text style={[styles.eyebrow, { color: colors.accent }]}>AFTER THIS JOB</Text>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Next scheduled pickup</Text>
-            </View>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Next scheduled pickup</Text>
           </View>
           <CompactNextJob job={nextJob} onPress={() => openJob(nextJob)} colors={colors} />
         </View>
@@ -170,7 +164,7 @@ const styles = StyleSheet.create({
   shiftSummary: { minHeight: 62, flexDirection: 'row', alignItems: 'center', borderRadius: radius.lg, paddingHorizontal: spacing.md, backgroundColor: brandColors.navy },
   shiftMetric: { flex: 1, gap: 2 },
   shiftValue: { color: brandColors.white, fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.xl },
-  shiftLabel: { color: 'rgba(251,252,248,0.68)', fontFamily: typography.fontFamily.bodyMedium, fontSize: 10 },
+  shiftLabel: { color: 'rgba(251,252,248,0.72)', fontFamily: typography.fontFamily.bodyMedium, fontSize: 11 },
   shiftStatus: { flex: 1.25, alignItems: 'flex-end', gap: 3 },
   shiftState: { color: brandColors.lightCopper, fontFamily: typography.fontFamily.bodyBold, fontSize: typography.fontSize.sm },
   heroDivider: { width: StyleSheet.hairlineWidth, height: 34, marginHorizontal: spacing.md, backgroundColor: 'rgba(251,252,248,0.2)' },
@@ -181,7 +175,6 @@ const styles = StyleSheet.create({
   jobSection: { gap: spacing.md },
   upNextSection: { gap: spacing.md, paddingTop: spacing.sm },
   sectionHeading: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md },
-  eyebrow: { fontFamily: typography.fontFamily.bodyBold, fontSize: 10, letterSpacing: 1.1 },
   sectionTitle: { marginTop: 2, fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg },
   nextStep: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, paddingHorizontal: spacing.xs },
   nextLabel: { fontFamily: typography.fontFamily.bodyBold, fontSize: typography.fontSize.sm },

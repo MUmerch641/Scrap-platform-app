@@ -74,7 +74,7 @@ function Meta({ icon, value, colors, grow = false }: { icon: 'cube-outline' | 's
 
 const styles = StyleSheet.create({
   card: {
-    minHeight: 176,
+    minHeight: 154,
     flexDirection: 'row',
     overflow: 'hidden',
     borderWidth: 1,
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
   },
   prominentCard: { borderWidth: 1 },
   androidShadow: { elevation: 1 },
-  content: { flex: 1, padding: spacing.md, gap: spacing.md },
+  content: { flex: 1, padding: spacing.md, gap: spacing.sm + 2 },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   titleBlock: { flex: 1, gap: 3 },
   name: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg, lineHeight: typography.lineHeight.lg },
@@ -93,5 +93,5 @@ const styles = StyleSheet.create({
   metaRow: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: spacing.sm },
   meta: { flex: 1, minWidth: 0, maxWidth: 92, flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaGrow: { flex: 1, maxWidth: undefined },
-  metaText: { flexShrink: 1, fontFamily: typography.fontFamily.bodyMedium, fontSize: 10 },
+  metaText: { flexShrink: 1, fontFamily: typography.fontFamily.bodyMedium, fontSize: 11 },
 });

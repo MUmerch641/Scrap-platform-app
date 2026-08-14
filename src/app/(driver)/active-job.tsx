@@ -304,10 +304,9 @@ export default function DriverActiveJobScreen() {
     <ScreenScaffold mode="form" header={<AppHeader title="Active Job" subtitle={job.customerName} />} contentContainerStyle={styles.content} androidKeyboardAvoidance>
       <View style={styles.overviewHero}>
         <View style={styles.overviewTop}>
-          <Text style={styles.overviewEyebrow}>PICKUP JOB</Text>
+          <Text style={styles.customerName} numberOfLines={2}>{job.customerName}</Text>
           <DriverStatusPill status={job.executionStatus} inverse />
         </View>
-        <Text style={styles.customerName}>{job.customerName}</Text>
         <View style={styles.heroDetail}><Ionicons name="time-outline" size={17} color={brandColors.lightCopper} /><Text style={styles.heroDetailText}>{schedule.time} · {schedule.date}</Text></View>
         <View style={styles.heroDetail}><Ionicons name="location-outline" size={17} color={brandColors.lightCopper} /><Text style={styles.heroDetailText} numberOfLines={2}>{job.pickupAddress}</Text></View>
       </View>
@@ -369,7 +368,7 @@ export default function DriverActiveJobScreen() {
 
       {nextAction ? (
         <View style={[styles.actionSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.actionCopy}><Text style={[styles.actionTitle, { color: colors.text }]}>{nextAction.title}</Text><Text style={[styles.actionDescription, { color: colors.textMuted }]}>{nextStepDescription(job.executionStatus)}</Text></View>
+          <View style={styles.actionCopy}><Text style={[styles.actionTitle, { color: colors.text }]}>Next action</Text><Text style={[styles.actionDescription, { color: colors.textMuted }]}>{nextStepDescription(job.executionStatus)}</Text></View>
           <Button title={nextAction.title} onPress={confirmTransition} loading={transitioning} disabled={isOffline} style={styles.primaryAction} />
           {isOffline ? <Text style={[styles.actionHint, { color: colors.warning }]}>Reconnect before changing job status.</Text> : null}
           {transitionError ? <Text style={[styles.actionError, { color: colors.danger }]}>{transitionError}</Text> : null}
@@ -390,9 +389,8 @@ function StageHeading({ title, subtitle, colors }: { title: string; subtitle: st
 const styles = StyleSheet.create({
   content: { gap: spacing.md, paddingTop: spacing.md },
   overviewHero: { padding: spacing.md, gap: spacing.sm, backgroundColor: brandColors.navy, borderRadius: radius.lg },
-  overviewTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  overviewEyebrow: { color: brandColors.lightCopper, fontFamily: typography.fontFamily.bodyBold, fontSize: 10, letterSpacing: 1.2 },
-  customerName: { color: brandColors.white, fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.xl, lineHeight: typography.lineHeight.xl },
+  overviewTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm },
+  customerName: { flex: 1, color: brandColors.white, fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg, lineHeight: typography.lineHeight.lg },
   heroDetail: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   heroDetailText: { flex: 1, color: 'rgba(251,252,248,0.84)', fontFamily: typography.fontFamily.bodyMedium, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm },
   nextStepBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingHorizontal: spacing.xs },
@@ -404,11 +402,11 @@ const styles = StyleSheet.create({
   sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   sectionHeadingCopy: { flex: 1, gap: 2 },
   sectionTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.md },
-  sectionSubtitle: { fontFamily: typography.fontFamily.body, fontSize: 10 },
+  sectionSubtitle: { fontFamily: typography.fontFamily.body, fontSize: 11 },
   infoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   infoItem: { width: '46%', minWidth: 126, flexGrow: 1, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   infoCopy: { flex: 1, gap: 2 },
-  infoLabel: { fontFamily: typography.fontFamily.bodyMedium, fontSize: 10 },
+  infoLabel: { fontFamily: typography.fontFamily.bodyMedium, fontSize: 11 },
   infoValue: { fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm },
   secondaryButton: { minHeight: 46, borderRadius: radius.lg },
   instructionsCard: { borderLeftWidth: 4, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
@@ -420,7 +418,7 @@ const styles = StyleSheet.create({
   stageTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg },
   stageSubtitle: { fontFamily: typography.fontFamily.body, fontSize: typography.fontSize.xs },
   notesInput: { minHeight: 112, paddingTop: spacing.sm, paddingBottom: spacing.sm },
-  characterCount: { marginTop: -spacing.md, fontFamily: typography.fontFamily.bodyMedium, fontSize: 10, textAlign: 'right' },
+  characterCount: { marginTop: -spacing.md, fontFamily: typography.fontFamily.bodyMedium, fontSize: 11, textAlign: 'right' },
   actionSection: { marginTop: spacing.sm, gap: spacing.md, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
   actionCopy: { flex: 1, gap: 2 },
   actionTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg },

@@ -112,7 +112,7 @@ export default function DriverJobsScreen() {
           contentContainerStyle={jobs.length ? styles.list : styles.empty}
           ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} tintColor={colors.accent} />}
-          ListHeaderComponent={jobs.length ? <View style={styles.listHeader}><View><Text style={[styles.listEyebrow, { color: colors.accent }]}>{filter.toUpperCase()}</Text><Text style={[styles.listTitle, { color: colors.text }]}>{jobs.length} {jobs.length === 1 ? 'pickup' : 'pickups'}</Text></View>{isOffline ? <View style={styles.offlineBadge}><Ionicons name="cloud-offline-outline" size={14} color={colors.warning} /><Text style={[styles.offlineLabel, { color: colors.warning }]}>Offline</Text></View> : null}</View> : null}
+          ListHeaderComponent={jobs.length ? <View style={styles.listHeader}><Text style={[styles.listTitle, { color: colors.text }]}>{jobs.length} {jobs.length === 1 ? 'pickup' : 'pickups'}</Text>{isOffline ? <View style={styles.offlineBadge}><Ionicons name="cloud-offline-outline" size={14} color={colors.warning} /><Text style={[styles.offlineLabel, { color: colors.warning }]}>Offline</Text></View> : null}</View> : null}
           ListEmptyComponent={<View style={styles.emptyPanel}><View style={[styles.emptyIcon, { backgroundColor: colors.surface }]}><Ionicons name={filter === 'completed' ? 'checkmark-done-outline' : 'calendar-clear-outline'} size={32} color={colors.accent} /></View><Text style={[styles.emptyTitle, { color: colors.text }]}>{empty[0]}</Text><Text style={[styles.emptyMessage, { color: colors.textMuted }]}>{empty[1]}</Text></View>}
           onEndReached={() => void loadMore()}
           onEndReachedThreshold={0.4}
@@ -128,11 +128,10 @@ const styles = StyleSheet.create({
   filterBar: { flexDirection: 'row', gap: spacing.xs, borderWidth: 1, borderRadius: radius.xl, padding: spacing.xs },
   filter: { minHeight: 42, flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5, borderRadius: radius.lg, paddingHorizontal: spacing.xs },
   filterPressed: { opacity: 0.72 },
-  filterText: { fontFamily: typography.fontFamily.bodySemibold, fontSize: 11 },
+  filterText: { fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.xs },
   list: { paddingBottom: spacing.xl, paddingTop: spacing.sm },
   empty: { flexGrow: 1, justifyContent: 'center' },
   listHeader: { minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: spacing.md },
-  listEyebrow: { fontFamily: typography.fontFamily.bodyBold, fontSize: 10, letterSpacing: 1 },
   listTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg },
   offlineBadge: { flexDirection: 'row', gap: spacing.xs, alignItems: 'center' },
   offlineLabel: { fontFamily: typography.fontFamily.bodyBold, fontSize: typography.fontSize.xs },
