@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
   actionText: { fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.xs },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   tile: { width: '30.8%', aspectRatio: 0.92, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, borderWidth: 1, borderRadius: radius.lg },
-  tileShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,45,69,0.34)' },
+  tileShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,45,69,0.34)' },
   failedShade: { backgroundColor: 'rgba(127,29,29,0.66)' },
   tileStatus: { color: brandColors.white, fontFamily: typography.fontFamily.bodyBold, fontSize: 9 },
   empty: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderRadius: radius.lg, paddingHorizontal: spacing.md },

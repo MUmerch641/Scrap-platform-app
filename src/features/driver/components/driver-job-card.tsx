@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
   iconDisc: { width: 32, height: 32, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
   address: { flex: 1, fontFamily: typography.fontFamily.bodyMedium, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm },
   metaRow: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: spacing.sm },
-  meta: { maxWidth: 92, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  meta: { flex: 1, minWidth: 0, maxWidth: 92, flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaGrow: { flex: 1, maxWidth: undefined },
   metaText: { flexShrink: 1, fontFamily: typography.fontFamily.bodyMedium, fontSize: 10 },
 });

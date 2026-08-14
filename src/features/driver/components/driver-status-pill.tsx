@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, useColorScheme, View } from 'react-native';
 
 import { brandColors, radius, spacing, typography } from '@/shared/theme';
 
@@ -23,11 +23,12 @@ export function DriverStatusPill({
   inverse?: boolean;
 }) {
   const tone = STATUS_TONES[status];
-  const foreground = inverse ? brandColors.offWhite : tone.foreground;
+  const isDark = useColorScheme() === 'dark';
+  const foreground = inverse || isDark ? (status === 'delivered_to_yard' ? 'rgba(251,252,248,0.76)' : brandColors.lightCopper) : tone.foreground;
   return (
     <View style={[
       styles.pill,
-      { backgroundColor: inverse ? 'rgba(251, 252, 248, 0.14)' : tone.background },
+      { backgroundColor: inverse || isDark ? 'rgba(251, 252, 248, 0.12)' : tone.background },
     ]}>
       <Ionicons name={status === 'delivered_to_yard' ? 'checkmark-circle' : 'ellipse'} size={10} color={foreground} />
       <Text style={[styles.label, { color: foreground }]}>{formatDriverStatus(status)}</Text>

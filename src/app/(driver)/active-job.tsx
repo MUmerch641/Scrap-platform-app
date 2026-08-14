@@ -22,7 +22,7 @@ import {
   validateDriverMaterialCollectionInput,
 } from '@/features/driver/services/driver-job-service';
 import { notifyDriverJobsChanged, subscribeToDriverJobsChanged } from '@/features/driver/services/driver-job-refresh';
-import { formatDriverSchedule, formatDriverStatus, formatDriverVehicle, formatDriverWeight } from '@/features/driver/driver-job-formatters';
+import { formatDriverSchedule, formatDriverVehicle, formatDriverWeight } from '@/features/driver/driver-job-formatters';
 import { showErrorMessage, showNativeConfirmation, showSuccessMessage } from '@/services/native-feedback-service';
 import { brandColors, radius, semanticColors, spacing, typography } from '@/shared/theme';
 import { Ionicons } from '@expo/vector-icons';
