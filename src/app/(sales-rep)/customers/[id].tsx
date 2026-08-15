@@ -1,4 +1,4 @@
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Href, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import { Image, Linking, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 
@@ -119,6 +119,7 @@ export default function CustomerDetailScreen() {
       <View style={styles.container}>
         <View style={styles.actions}>
           <Button title="Create New Pickup" onPress={() => startPickup()} style={styles.primaryAction} />
+          <Button title="Add Follow-Up" variant="secondary" onPress={() => router.push({ pathname: '/(sales-rep)/follow-ups', params: { customerId: customer.id, customerName: customer.name } } as unknown as Href)} style={styles.primaryAction} />
           <Button title="Edit Customer" variant="outline" onPress={() => router.push({ pathname: '/(sales-rep)/customers', params: { editCustomerId: customer.id } })} style={styles.primaryAction} />
         </View>
 

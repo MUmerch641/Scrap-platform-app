@@ -60,6 +60,11 @@ export default function SalesRepLayout() {
         <NativeTabs.Trigger.Icon sf="person.2" md="people" />
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="follow-ups">
+        <NativeTabs.Trigger.Label>Follow-Ups</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="checklist" md="event_note" />
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="profile">
         <NativeTabs.Trigger.Label>Profile</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="person" md="person" />

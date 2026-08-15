@@ -10,6 +10,10 @@ function isAvailableJobsNotification(data: unknown): boolean {
   return Boolean(data && typeof data === 'object' && (data as { route?: unknown }).route === 'driver_available_jobs');
 }
 
+function isSalesRepFollowUpNotification(data: unknown): boolean {
+  return Boolean(data && typeof data === 'object' && (data as { route?: unknown }).route === 'sales_rep_follow_ups');
+}
+
 export function PushNotificationManager() {
   const { user, role, isActive } = useUserRole();
 
@@ -34,6 +38,18 @@ export function PushNotificationManager() {
       if (response?.notification) openAvailableJobs(response.notification);
     });
     const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => openAvailableJobs(response.notification));
+    return () => responseSubscription.remove();
+  }, [role]);
+
+  React.useEffect(() => {
+    if (role !== ROLES.SALES_REP) return;
+    const openFollowUps = (notification: Notifications.Notification) => {
+      if (isSalesRepFollowUpNotification(notification.request.content.data)) router.push('/(sales-rep)/follow-ups' as never);
+    };
+    void Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response?.notification) openFollowUps(response.notification);
+    });
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => openFollowUps(response.notification));
     return () => responseSubscription.remove();
   }, [role]);
 
