@@ -5,6 +5,7 @@ import { BottomSheet, BottomSheetView } from '@expo/ui/community/bottom-sheet';
 import React, { useCallback, useRef, useState } from 'react';
 import {
   FlatList,
+  Image,
   ListRenderItemInfo,
   Modal,
   Platform,
@@ -59,6 +60,7 @@ import {
 } from '@/services/pickup-service';
 import {
   PendingSalesRepPickupPhoto,
+  discardSalesRepPickupPhoto,
   uploadSalesRepPickupPhoto,
   validatePendingSalesRepPickupPhoto,
 } from '@/services/sales-rep-pickup-photo-service';
@@ -630,6 +632,7 @@ export default function CreatePickupScreen() {
   const [internalNotes, setInternalNotes] = useState('');
   const [notes,           setNotes]           = useState('');
   const [pendingPhotos, setPendingPhotos] = useState<PendingSalesRepPickupPhoto[]>([]);
+  const [previewPhoto, setPreviewPhoto] = useState<PendingSalesRepPickupPhoto | null>(null);
   const [submittedPickupId, setSubmittedPickupId] = useState<string | null>(null);
   const [submitting,      setSubmitting]      = useState(false);
   const [formError,       setFormError]       = useState<string | null>(null);
@@ -792,6 +795,17 @@ export default function CreatePickupScreen() {
       return;
     }
     setPendingPhotos((current) => [...current, photo]);
+  }, []);
+
+  const removePendingPhoto = useCallback(async (photo: PendingSalesRepPickupPhoto) => {
+    if (photo.status === 'uploading') return;
+    const discarded = await discardSalesRepPickupPhoto(photo);
+    if (!discarded.success) {
+      showErrorMessage(discarded.error, 'Photo not removed');
+      return;
+    }
+    setPendingPhotos((current) => current.filter((item) => item.id !== photo.id));
+    setPreviewPhoto((current) => current?.id === photo.id ? null : current);
   }, []);
 
   const handleSubmit = async () => {
@@ -1079,8 +1093,23 @@ export default function CreatePickupScreen() {
             </View>
             {pendingPhotos.map((photo, index) => (
               <View key={photo.id} style={[styles.photoRow, { borderColor: colors.border }]}>
-                <Text style={[styles.photoName, { color: colors.text }]}>Scrap photo {index + 1}</Text>
-                <Text style={[styles.photoStatus, { color: photo.status === 'failed' ? colors.danger : colors.textMuted }]}>{photo.status === 'failed' ? photo.error ?? 'Upload failed' : photo.status === 'uploading' ? 'Uploading…' : 'Ready to upload'}</Text>
+                <View style={styles.photoRowContent}>
+                  <Pressable
+                    onPress={() => setPreviewPhoto(photo)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Preview scrap photo ${index + 1}`}
+                  >
+                    <Image source={{ uri: photo.uri }} style={styles.photoThumbnail} />
+                  </Pressable>
+                  <View style={styles.photoDetails}>
+                    <Text style={[styles.photoName, { color: colors.text }]}>Scrap photo {index + 1}</Text>
+                    <Text style={[styles.photoStatus, { color: photo.status === 'failed' ? colors.danger : colors.textMuted }]}>{photo.status === 'failed' ? photo.error ?? 'Upload failed' : photo.status === 'uploading' ? 'Uploading…' : 'Ready to upload'}</Text>
+                    <View style={styles.photoRowActions}>
+                      <Pressable onPress={() => setPreviewPhoto(photo)} accessibilityRole="button"><Text style={[styles.photoActionText, { color: colors.primary }]}>Preview</Text></Pressable>
+                      {photo.status !== 'uploading' ? <Pressable onPress={() => void removePendingPhoto(photo)} accessibilityRole="button"><Text style={[styles.photoActionText, { color: colors.danger }]}>Remove</Text></Pressable> : null}
+                    </View>
+                  </View>
+                </View>
               </View>
             ))}
           </View>
@@ -1198,6 +1227,17 @@ export default function CreatePickupScreen() {
         onCancel={() => setActiveIOSPicker(null)}
         onDone={applyIOSPicker}
       />
+      <Modal visible={Boolean(previewPhoto)} transparent animationType="fade" onRequestClose={() => setPreviewPhoto(null)}>
+        <Pressable style={styles.previewBackdrop} onPress={() => setPreviewPhoto(null)}>
+          <Pressable style={[styles.previewCard, { backgroundColor: colors.surface }]} onPress={() => undefined}>
+            <View style={styles.previewHeader}>
+              <Text style={[styles.previewTitle, { color: colors.text }]}>Scrap photo preview</Text>
+              <Pressable onPress={() => setPreviewPhoto(null)} accessibilityRole="button" accessibilityLabel="Close photo preview"><Text style={[styles.photoActionText, { color: colors.primary }]}>Close</Text></Pressable>
+            </View>
+            {previewPhoto ? <Image source={{ uri: previewPhoto.uri }} resizeMode="contain" style={styles.previewImage} /> : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScreenScaffold>
   );
 }
@@ -1247,6 +1287,29 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     gap: 2,
   },
+  photoRowContent: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  photoThumbnail: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.md,
+    backgroundColor: '#D9D9D9',
+  },
+  photoDetails: {
+    flex: 1,
+    gap: 2,
+  },
+  photoRowActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.xs,
+  },
+  photoActionText: {
+    fontFamily: typography.fontFamily.bodySemibold,
+    fontSize: typography.fontSize.xs,
+  },
   photoName: {
     fontFamily: typography.fontFamily.bodyMedium,
     fontSize: typography.fontSize.sm,
@@ -1254,6 +1317,33 @@ const styles = StyleSheet.create({
   photoStatus: {
     fontFamily: typography.fontFamily.body,
     fontSize: typography.fontSize.xs,
+  },
+  previewBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  previewCard: {
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    gap: spacing.sm,
+    maxHeight: '80%',
+  },
+  previewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  previewTitle: {
+    fontFamily: typography.fontFamily.heading,
+    fontSize: typography.fontSize.md,
+  },
+  previewImage: {
+    width: '100%',
+    aspectRatio: 1,
+    maxHeight: 480,
+    borderRadius: radius.md,
   },
 
   // ── Selector trigger ───────────────────────────────────────────────────────

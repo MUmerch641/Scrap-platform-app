@@ -111,3 +111,20 @@ export async function uploadSalesRepPickupPhoto(
     };
   }
 }
+
+/** Removes a pending metadata record when a Sales Rep cancels a failed upload. */
+export async function discardSalesRepPickupPhoto(
+  photo: Pick<PendingSalesRepPickupPhoto, 'remotePhotoId'>,
+): Promise<{ success: true } | { success: false; error: string }> {
+  if (!photo.remotePhotoId) return { success: true };
+  if (supabaseConfigurationError) return { success: false, error: supabaseConfigurationError };
+  try {
+    const { error } = await supabase.rpc('discard_sales_rep_pickup_photo_metadata', {
+      p_photo_id: photo.remotePhotoId,
+    });
+    if (error) return { success: false, error: 'Unable to remove this pending photo. Please try again.' };
+    return { success: true };
+  } catch {
+    return { success: false, error: 'Unable to connect to service. Please try again.' };
+  }
+}
