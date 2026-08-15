@@ -108,11 +108,13 @@ export default function DriverActiveJobScreen() {
   const load = useCallback(async () => {
     if (isOffline) { setLoading(false); return; }
     if (jobId && !UUID_PATTERN.test(jobId)) { setJob(null); setScreenState('unavailable'); setLoading(false); return; }
+    if (__DEV__) console.log('[driver-active-job] loading detail', { p_job_id: jobId ?? null });
     const id = ++requestId.current;
     setScreenState('ready');
     setTransitionError(null);
     const result = await fetchDriverJobs({ page: 0, pageSize: 2, jobId, executionStatuses: jobId ? undefined : ACTIVE_STATUSES });
     if (id !== requestId.current) return;
+    if (__DEV__) console.log('[driver-active-job] detail result', { p_job_id: jobId ?? null, success: result.success, jobCount: result.jobs.length, error: result.error, job: result.jobs[0] ?? null });
     if (!result.success) { if (!hasLoadedJobRef.current) setScreenState('error'); setLoading(false); return; }
     if (result.jobs.length > 1 && !jobId) { setJob(null); hasLoadedJobRef.current = false; setScreenState('conflict'); setLoading(false); return; }
     const nextJob = result.jobs[0] ?? null;

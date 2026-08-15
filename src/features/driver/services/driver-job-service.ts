@@ -186,8 +186,8 @@ function mapAvailableJob(row: RawAvailableDriverJob): AvailableDriverJob {
   };
 }
 
-function mapError(operation: string, error: { code?: string } | null): string {
-  if (__DEV__) console.warn(`[driver-job-service] ${operation} failed`, { code: error?.code });
+function mapError(operation: string, error: { code?: string; message?: string; details?: string; hint?: string } | null): string {
+  if (__DEV__) console.warn(`[driver-job-service] ${operation} failed`, error);
   return 'Unable to load jobs. Check your connection and try again.';
 }
 
@@ -283,7 +283,7 @@ export async function fetchDriverJobs(options: DriverJobPageOptions): Promise<Dr
   const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Math.trunc(options.pageSize ?? DRIVER_JOB_PAGE_SIZE)));
 
   try {
-    const { data, error } = await supabase.rpc('get_driver_jobs', {
+    const rpcArgs = {
       p_limit: pageSize + 1,
       p_offset: page * pageSize,
       p_job_id: options.jobId ?? null,
@@ -292,9 +292,14 @@ export async function fetchDriverJobs(options: DriverJobPageOptions): Promise<Dr
       p_execution_statuses: options.executionStatuses?.length ? options.executionStatuses : null,
       p_sort: options.sort ?? 'scheduled_asc',
       p_timezone: getDeviceTimeZone(),
-    });
+    };
+    if (__DEV__) console.log('[driver-job-service] get_driver_jobs request', rpcArgs);
+    const { data, error } = await supabase.rpc('get_driver_jobs', rpcArgs);
+    if (__DEV__) console.log('[driver-job-service] get_driver_jobs response', { data, error });
     if (error) return { success: false, jobs: [], hasMore: false, error: mapError('load jobs', error) };
-    const rows = (data ?? []) as RawDriverJob[];
+    // A table-returning RPC normally returns an array, but normalize a single
+    // row as well so a valid detail response is not discarded by `.slice()`.
+    const rows = (Array.isArray(data) ? data : data ? [data] : []) as RawDriverJob[];
     return { success: true, jobs: rows.slice(0, pageSize).map(mapJob), hasMore: rows.length > pageSize };
   } catch {
     return { success: false, jobs: [], hasMore: false, error: 'Unable to connect to service. Check your connection and try again.' };
