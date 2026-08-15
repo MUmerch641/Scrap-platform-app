@@ -123,7 +123,7 @@ export default function DriverJobsScreen() {
     setAvailableJobs((current) => current.filter((job) => job.id !== jobId));
     notifyDriverJobsChanged();
     showInfoMessage(result.alreadyAccepted ? 'This job is already assigned to you.' : 'Job accepted.');
-    router.push({ pathname: '/(driver)/active-job', params: { jobId: result.jobId ?? jobId } });
+    router.push({ pathname: '/(driver)/active-job', params: { pickupJobId: result.jobId ?? jobId } });
   };
 
   const visibleItems = view === 'available' ? availableJobs : jobs;

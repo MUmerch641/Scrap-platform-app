@@ -72,8 +72,14 @@ const NEXT_ACTIONS: Partial<Record<DriverJob['executionStatus'], {
 export default function DriverActiveJobScreen() {
   const router = useRouter();
   const { showDialog } = useAppDialog();
-  const { jobId: routeJobId } = useLocalSearchParams<{ jobId?: string }>();
-  const jobId = typeof routeJobId === 'string' ? routeJobId : undefined;
+  const { pickupJobId: routePickupJobId, jobId: legacyRouteJobId } = useLocalSearchParams<{
+    pickupJobId?: string | string[];
+    jobId?: string | string[];
+  }>();
+  // The accept RPC returns pickup_job_id. Keep the old jobId parameter as a
+  // compatibility fallback for existing Home/Jobs links.
+  const firstRouteValue = (value: string | string[] | undefined) => Array.isArray(value) ? value[0] : value;
+  const jobId = firstRouteValue(routePickupJobId) ?? firstRouteValue(legacyRouteJobId);
   const { isOffline } = useNetworkStatus();
   const colors = semanticColors[useColorScheme() === 'dark' ? 'dark' : 'light'];
   const [job, setJob] = useState<DriverJob | null>(null);
