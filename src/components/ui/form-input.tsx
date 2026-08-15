@@ -53,7 +53,8 @@ export const FormInput = forwardRef<RNTextInput, FormInputProps>(
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const isAndroid = Platform.OS === 'android';
-    const useCompactIOSInput = Platform.OS === 'ios' && props.multiline !== true;
+    const isMultiline = props.multiline === true;
+    const useCompactIOSInput = Platform.OS === 'ios' && !isMultiline;
 
     const colors = semanticColors[isDark ? 'dark' : 'light'];
 
@@ -92,6 +93,7 @@ export const FormInput = forwardRef<RNTextInput, FormInputProps>(
           style={[
             styles.inputWrapper,
             useCompactIOSInput && styles.inputWrapperCompactIOS,
+            isMultiline && styles.inputWrapperMultiline,
             useAndroidLightStyle
               ? styles.inputWrapperAndroidLight
               : styles.inputWrapperOutlined,
@@ -124,6 +126,7 @@ export const FormInput = forwardRef<RNTextInput, FormInputProps>(
             style={[
               styles.input,
               useCompactIOSInput && styles.inputCompactIOS,
+              isMultiline ? styles.inputMultiline : styles.inputSingleLine,
               {
                 color: colors.inputText,
               },
@@ -244,6 +247,9 @@ const styles = StyleSheet.create({
   inputWrapperCompactIOS: {
     minHeight: 44,
   },
+  inputWrapperMultiline: {
+    alignItems: 'flex-start',
+  },
 
   inputWrapperAndroidLight: {
     borderWidth: 0,
@@ -272,6 +278,15 @@ const styles = StyleSheet.create({
   inputCompactIOS: {
     minHeight: 44,
     height: 44,
+  },
+  inputSingleLine: {
+    paddingVertical: 0,
+    textAlignVertical: 'center',
+  },
+  inputMultiline: {
+    textAlignVertical: 'top',
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
   },
 
   eyeToggle: {

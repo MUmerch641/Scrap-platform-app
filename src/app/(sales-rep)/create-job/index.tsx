@@ -647,6 +647,11 @@ export default function CreatePickupScreen() {
   const minimumPickupDate = new Date();
   minimumPickupDate.setHours(0, 0, 0, 0);
 
+  const showSubmissionFailure = (message: string) => {
+    setFormError(message);
+    showErrorMessage(message, 'Submission Error');
+  };
+
   const openIOSPicker = (mode: IOSPickerMode) => {
     setPickerDraft(
       mode === 'date'
@@ -752,49 +757,53 @@ export default function CreatePickupScreen() {
   }, []);
 
   const selectPhoto = useCallback(async (source: 'camera' | 'library') => {
-    const permission = source === 'camera'
-      ? await ImagePicker.requestCameraPermissionsAsync()
-      : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      showErrorMessage(
-        source === 'camera'
-          ? 'Camera access is needed to take a scrap photo.'
-          : 'Photo library access is needed to choose a scrap photo.',
-        'Permission needed',
-      );
-      return;
-    }
+    try {
+      const permission = source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        showErrorMessage(
+          source === 'camera'
+            ? 'Camera access is needed to take a scrap photo.'
+            : 'Photo library access is needed to choose a scrap photo.',
+          'Permission needed',
+        );
+        return;
+      }
 
-    const options: ImagePicker.ImagePickerOptions = {
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.85,
-      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
-      ...(source === 'camera' ? { cameraType: ImagePicker.CameraType.back } : {}),
-    };
-    const result = source === 'camera'
-      ? await ImagePicker.launchCameraAsync(options)
-      : await ImagePicker.launchImageLibraryAsync(options);
-    if (result.canceled || !result.assets[0]) return;
+      const options: ImagePicker.ImagePickerOptions = {
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.85,
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+        ...(source === 'camera' ? { cameraType: ImagePicker.CameraType.back } : {}),
+      };
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync(options)
+        : await ImagePicker.launchImageLibraryAsync(options);
+      if (result.canceled || !result.assets[0]) return;
 
-    const asset = result.assets[0];
-    if (asset.mimeType !== 'image/jpeg' && asset.mimeType !== 'image/png') {
-      showErrorMessage('Choose a JPEG or PNG photo. iPhone photos should be shared in a compatible format.', 'Unsupported photo');
-      return;
+      const asset = result.assets[0];
+      if (asset.mimeType !== 'image/jpeg' && asset.mimeType !== 'image/png') {
+        showErrorMessage('Choose a JPEG or PNG photo. iPhone photos should be shared in a compatible format.', 'Unsupported photo');
+        return;
+      }
+      const photo: PendingSalesRepPickupPhoto = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        uri: asset.uri,
+        mimeType: asset.mimeType,
+        fileSize: asset.fileSize ?? undefined,
+        status: 'ready',
+      };
+      const validationError = validatePendingSalesRepPickupPhoto(photo);
+      if (validationError) {
+        showErrorMessage(validationError, 'Unsupported photo');
+        return;
+      }
+      setPendingPhotos((current) => [...current, photo]);
+    } catch {
+      showErrorMessage('Unable to open the camera or photo library. Please try again.', 'Photo unavailable');
     }
-    const photo: PendingSalesRepPickupPhoto = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      uri: asset.uri,
-      mimeType: asset.mimeType,
-      fileSize: asset.fileSize ?? undefined,
-      status: 'ready',
-    };
-    const validationError = validatePendingSalesRepPickupPhoto(photo);
-    if (validationError) {
-      showErrorMessage(validationError, 'Unsupported photo');
-      return;
-    }
-    setPendingPhotos((current) => [...current, photo]);
   }, []);
 
   const removePendingPhoto = useCallback(async (photo: PendingSalesRepPickupPhoto) => {
@@ -818,11 +827,13 @@ export default function CreatePickupScreen() {
       try {
         const uploaded = await uploadPhotosForPickup(submittedPickupId, pendingPhotos);
         if (!uploaded) {
-          setFormError('Pickup request was submitted, but one or more scrap photos failed. Tap Retry Uploads to try again.');
+          showSubmissionFailure('Pickup request was submitted, but one or more scrap photos failed. Tap Retry Uploads to try again.');
           return;
         }
         showInfoMessage('Pickup request submitted successfully');
         router.push('/(sales-rep)/(home)');
+      } catch {
+        showSubmissionFailure('Pickup request was submitted, but uploads could not be retried. Check your connection and try again.');
       } finally {
         isSubmittingRef.current = false;
         setSubmitting(false);
@@ -909,7 +920,7 @@ export default function CreatePickupScreen() {
           setSubmittedPickupId(result.request.id);
           const uploaded = await uploadPhotosForPickup(result.request.id, pendingPhotos);
           if (!uploaded) {
-            setFormError('Pickup request was submitted, but one or more scrap photos failed. Tap Retry Uploads to try again.');
+            showSubmissionFailure('Pickup request was submitted, but one or more scrap photos failed. Tap Retry Uploads to try again.');
             return;
           }
         }
@@ -917,9 +928,10 @@ export default function CreatePickupScreen() {
         router.push('/(sales-rep)/(home)');
       } else {
         const msg = result.error ?? 'Failed to submit pickup request.';
-        setFormError(msg);
-        if (Platform.OS === 'ios') showErrorMessage(msg, 'Submission Error');
+        showSubmissionFailure(msg);
       }
+    } catch {
+      showSubmissionFailure('Unable to submit the pickup request. Check your connection and try again.');
     } finally {
       isSubmittingRef.current = false;
       setSubmitting(false);
@@ -1202,6 +1214,15 @@ export default function CreatePickupScreen() {
 
         {/* Submit */}
         <FadeSlide delay={7 * STAGGER_MS}>
+          {formError ? (
+            <View
+              accessibilityLiveRegion="polite"
+              style={[styles.submitError, { backgroundColor: colors.surface, borderColor: colors.danger }]}
+            >
+              <Text style={[styles.submitErrorTitle, { color: colors.danger }]}>Please check the form</Text>
+              <Text style={[styles.errorBanner, { color: colors.danger }]}>{formError}</Text>
+            </View>
+          ) : null}
           <Button
             title={submittedPickupId ? 'Retry Uploads' : 'Submit Pickup Request'}
             onPress={() => void handleSubmit()}
@@ -1267,6 +1288,17 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.xs,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  submitError: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    gap: 2,
+    marginBottom: spacing.sm,
+  },
+  submitErrorTitle: {
+    fontFamily: typography.fontFamily.bodySemibold,
+    fontSize: typography.fontSize.sm,
   },
   sectionTitle: {
     fontFamily: typography.fontFamily.heading,
