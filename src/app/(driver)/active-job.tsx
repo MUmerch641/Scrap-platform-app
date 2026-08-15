@@ -108,7 +108,10 @@ export default function DriverActiveJobScreen() {
   const load = useCallback(async () => {
     if (isOffline) { setLoading(false); return; }
     if (jobId && !UUID_PATTERN.test(jobId)) { setJob(null); setScreenState('unavailable'); setLoading(false); return; }
-    if (__DEV__) console.log('[driver-active-job] loading detail', { p_job_id: jobId ?? null });
+    if (__DEV__) console.log('[driver-active-job] loading detail', {
+      p_job_id: jobId ?? null,
+      source: routePickupJobId ? 'pickupJobId' : legacyRouteJobId ? 'jobId' : 'none',
+    });
     const id = ++requestId.current;
     setScreenState('ready');
     setTransitionError(null);
@@ -124,7 +127,7 @@ export default function DriverActiveJobScreen() {
     hasLoadedJobRef.current = result.jobs.length > 0;
     setScreenState(result.jobs.length ? 'ready' : 'unavailable');
     setLoading(false);
-  }, [isOffline, jobId, refreshPhotos]);
+  }, [isOffline, jobId, legacyRouteJobId, refreshPhotos, routePickupJobId]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
