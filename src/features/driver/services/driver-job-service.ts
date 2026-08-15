@@ -297,12 +297,14 @@ export async function fetchDriverJobs(options: DriverJobPageOptions): Promise<Dr
     const { data, error } = await supabase.rpc('get_driver_jobs', rpcArgs);
     if (__DEV__) {
       console.log('[driver-job-service] get_driver_jobs response data', data);
-      console.error('[driver-job-service] get_driver_jobs error', error ? {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
-      } : null);
+      if (error) {
+        console.error('[driver-job-service] get_driver_jobs error', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+      }
     }
     if (error) return { success: false, jobs: [], hasMore: false, error: mapError('load jobs', error) };
     // A table-returning RPC normally returns an array, but normalize a single
