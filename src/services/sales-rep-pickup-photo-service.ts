@@ -58,8 +58,13 @@ export async function uploadSalesRepPickupPhoto(
 
   try {
     const response = await fetch(photo.uri);
-    const body = await response.blob();
-    const fileSize = photo.fileSize ?? body.size;
+    if (!response.ok) {
+      throw new Error(`Unable to read the selected photo (${response.status}).`);
+    }
+    // React Native's Blob implementation is not a reliable Storage upload body.
+    // ArrayBuffer is supported by supabase-js on both iOS and Android.
+    const body = await response.arrayBuffer();
+    const fileSize = photo.fileSize ?? body.byteLength;
     const resolvedValidationError = validatePendingSalesRepPickupPhoto({
       mimeType: photo.mimeType,
       fileSize,

@@ -1100,8 +1100,8 @@ export default function CreatePickupScreen() {
             <Text style={[styles.fieldLabel, { color: colors.text }]}>Scrap Photos (Optional)</Text>
             <Text style={[styles.helpText, { color: colors.textMuted }]}>Photos upload after the pickup request is created. Failed uploads stay here so you can retry.</Text>
             <View style={styles.photoActions}>
-              <Button title="Take Photo" variant="secondary" onPress={() => void selectPhoto('camera')} disabled={submitting || submittedPickupId !== null} />
-              <Button title="Choose Photo" variant="secondary" onPress={() => void selectPhoto('library')} disabled={submitting || submittedPickupId !== null} />
+              <Button title="Take Photo" variant="secondary" onPress={() => void selectPhoto('camera')} disabled={submitting} />
+              <Button title="Choose Photo" variant="secondary" onPress={() => void selectPhoto('library')} disabled={submitting} />
             </View>
             {pendingPhotos.map((photo, index) => (
               <View key={photo.id} style={[styles.photoRow, { borderColor: colors.border }]}>
