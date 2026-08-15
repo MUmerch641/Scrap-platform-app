@@ -45,23 +45,53 @@ export async function uploadDriverJobPhoto(jobId: string, photo: PendingDriverJo
   if (supabaseConfigurationError) return { success: false, error: supabaseConfigurationError, assignmentUnavailable: false };
   const validationError = validatePendingDriverPhoto(photo);
   if (validationError) return { success: false, error: validationError, assignmentUnavailable: false };
+  const fileName = `evidence.${photo.mimeType === 'image/png' ? 'png' : 'jpg'}`;
   const formData = new FormData();
   formData.append('pickupJobId', jobId);
   formData.append('photoType', photo.photoType);
-  formData.append('file', { uri: photo.uri, name: `evidence.${photo.mimeType === 'image/png' ? 'png' : 'jpg'}`, type: photo.mimeType } as never);
+  formData.append('file', { uri: photo.uri, name: fileName, type: photo.mimeType } as never);
   try {
-    const { error } = await supabase.functions.invoke('driver-job-photo-upload', { body: formData });
-    if (!error) return { success: true };
-    const message = await readFunctionError(error);
-    const safeError = mapUploadError(message);
+    if (__DEV__) console.log('[driver-job-photo] invoking driver-job-photo-upload', {
+      pickupJobId: jobId,
+      photoType: photo.photoType,
+      mimeType: photo.mimeType,
+      fileName,
+      fileSize: photo.fileSize ?? null,
+      uri: photo.uri,
+    });
+    const { data, error } = await supabase.functions.invoke('driver-job-photo-upload', { body: formData });
+    if (!error) {
+      if (__DEV__) console.log('[driver-job-photo] upload response', data);
+      return { success: true };
+    }
+    const functionError = await readFunctionError(error);
+    if (__DEV__) console.error('[driver-job-photo] upload error', functionError);
+    const safeError = mapUploadError(functionError.message);
     return { success: false, error: safeError, assignmentUnavailable: safeError.includes('no longer assigned') };
-  } catch {
+  } catch (error) {
+    if (__DEV__) console.error('[driver-job-photo] invoke threw before a response', serializeError(error));
     return { success: false, error: 'No connection. Your photo is ready to retry.', assignmentUnavailable: false };
   }
 }
 
-async function readFunctionError(error: unknown): Promise<string | undefined> {
-  const response = (error as { context?: { json?: () => Promise<{ error?: string }> } })?.context;
-  if (!response?.json) return undefined;
-  try { return (await response.json()).error; } catch { return undefined; }
+async function readFunctionError(error: unknown): Promise<{ name?: string; message?: string; status?: number; statusText?: string; body?: unknown }> {
+  const value = error as { name?: string; message?: string; context?: Response };
+  const response = value.context;
+  if (!response) return { name: value.name, message: value.message };
+  try {
+    const text = await response.clone().text();
+    let body: unknown = text || undefined;
+    try { body = text ? JSON.parse(text) : undefined; } catch { /* retain text response */ }
+    const responseMessage = typeof body === 'object' && body && 'error' in body && typeof body.error === 'string'
+      ? body.error
+      : value.message;
+    return { name: value.name, message: responseMessage, status: response.status, statusText: response.statusText, body };
+  } catch {
+    return { name: value.name, message: value.message, status: response.status, statusText: response.statusText };
+  }
+}
+
+function serializeError(error: unknown): { name?: string; message?: string; stack?: string } {
+  if (error instanceof Error) return { name: error.name, message: error.message, stack: error.stack };
+  return { message: String(error) };
 }

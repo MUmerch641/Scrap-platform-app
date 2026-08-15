@@ -144,7 +144,15 @@ export default function DriverActiveJobScreen() {
   );
 
   const uploadSelectedPhoto = useCallback(async (photo: PendingDriverJobPhoto) => {
-    if (!job || uploadingPhotoIdsRef.current.has(photo.id)) return;
+    if (!job) {
+      if (__DEV__) console.warn('[driver-active-job] photo upload skipped: no current job', { photoId: photo.id });
+      return;
+    }
+    if (uploadingPhotoIdsRef.current.has(photo.id)) {
+      if (__DEV__) console.warn('[driver-active-job] photo upload skipped: already uploading', { photoId: photo.id, jobId: job.id });
+      return;
+    }
+    if (__DEV__) console.log('[driver-active-job] starting photo upload', { jobId: job.id, photoId: photo.id, photoType: photo.photoType, mimeType: photo.mimeType, fileSize: photo.fileSize ?? null });
     uploadingPhotoIdsRef.current.add(photo.id);
     setPendingPhotos((current) => current.map((item) => item.id === photo.id ? { ...item, status: 'uploading', error: undefined } : item));
     const result = await uploadDriverJobPhoto(job.id, photo);
@@ -200,7 +208,7 @@ export default function DriverActiveJobScreen() {
     const validationError = validatePendingDriverPhoto(pending);
     if (validationError) { showErrorMessage(validationError, 'Unsupported photo'); return; }
     setPendingPhotos((current) => [...current, pending]);
-    void uploadSelectedPhoto(pending);
+    await uploadSelectedPhoto(pending);
   }, [uploadSelectedPhoto]);
 
   const callCustomer = async () => {
