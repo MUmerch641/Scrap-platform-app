@@ -152,6 +152,12 @@ export default function DriverActiveJobScreen() {
     if (result.assignmentUnavailable) await load();
   }, [job, load, refreshPhotos]);
 
+  const removePendingPhoto = useCallback((photo: PendingDriverJobPhoto) => {
+    if (uploadingPhotoIdsRef.current.has(photo.id)) return;
+    setPendingPhotos((current) => current.filter((item) => item.id !== photo.id));
+    setPhotoPreview((current) => current?.uri === photo.uri ? null : current);
+  }, []);
+
   const selectPhoto = useCallback(async (photoType: DriverJobPhotoType, source: 'camera' | 'library') => {
     const permission = source === 'camera'
       ? await ImagePicker.requestCameraPermissionsAsync()
@@ -391,8 +397,8 @@ export default function DriverActiveJobScreen() {
       {['arrived', 'material_collected', 'delivered_to_yard'].includes(job.executionStatus) ? (
         <View style={styles.stageBlock}>
           <StageHeading title="Photo evidence" subtitle="Capture a clear record of the pickup" colors={colors} />
-          <DriverJobPhotoSection title="Collection Photos" photoType="collection" photos={photos} pending={pendingPhotos} canAdd={job.executionStatus !== 'delivered_to_yard'} onTakePhoto={() => void selectPhoto('collection', 'camera')} onChoosePhoto={() => void selectPhoto('collection', 'library')} onRetry={(photo) => void uploadSelectedPhoto(photo)} onPreview={(uri, label) => setPhotoPreview({ uri, label })} />
-          {['material_collected', 'delivered_to_yard'].includes(job.executionStatus) ? <DriverJobPhotoSection title="Delivery Photos" photoType="delivery" photos={photos} pending={pendingPhotos} canAdd={job.executionStatus === 'material_collected'} onTakePhoto={() => void selectPhoto('delivery', 'camera')} onChoosePhoto={() => void selectPhoto('delivery', 'library')} onRetry={(photo) => void uploadSelectedPhoto(photo)} onPreview={(uri, label) => setPhotoPreview({ uri, label })} /> : null}
+          <DriverJobPhotoSection title="Collection Photos" photoType="collection" photos={photos} pending={pendingPhotos} canAdd={job.executionStatus !== 'delivered_to_yard'} onTakePhoto={() => void selectPhoto('collection', 'camera')} onChoosePhoto={() => void selectPhoto('collection', 'library')} onRetry={(photo) => void uploadSelectedPhoto(photo)} onRemove={removePendingPhoto} onPreview={(uri, label) => setPhotoPreview({ uri, label })} />
+          {['material_collected', 'delivered_to_yard'].includes(job.executionStatus) ? <DriverJobPhotoSection title="Delivery Photos" photoType="delivery" photos={photos} pending={pendingPhotos} canAdd={job.executionStatus === 'material_collected'} onTakePhoto={() => void selectPhoto('delivery', 'camera')} onChoosePhoto={() => void selectPhoto('delivery', 'library')} onRetry={(photo) => void uploadSelectedPhoto(photo)} onRemove={removePendingPhoto} onPreview={(uri, label) => setPhotoPreview({ uri, label })} /> : null}
         </View>
       ) : null}
 
