@@ -5,6 +5,9 @@ import { DriverJobPhoto, DriverJobPhotoType, PendingDriverJobPhoto } from '../ty
 const PHOTO_URL_EXPIRY_SECONDS = 300;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const PHOTO_BUCKET = 'driver-job-evidence';
+const DRIVER_PHOTO_UPLOAD_FUNCTION = 'driver-job-photo-upload';
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 type RawPhoto = { id: string; photo_type: DriverJobPhotoType; storage_path: string; mime_type: 'image/jpeg' | 'image/png'; file_size: number; created_at: string };
 
@@ -45,49 +48,68 @@ export async function uploadDriverJobPhoto(jobId: string, photo: PendingDriverJo
   if (supabaseConfigurationError) return { success: false, error: supabaseConfigurationError, assignmentUnavailable: false };
   const validationError = validatePendingDriverPhoto(photo);
   if (validationError) return { success: false, error: validationError, assignmentUnavailable: false };
-  const fileName = `evidence.${photo.mimeType === 'image/png' ? 'png' : 'jpg'}`;
-  const formData = new FormData();
-  formData.append('pickupJobId', jobId);
-  formData.append('photoType', photo.photoType);
-  formData.append('file', { uri: photo.uri, name: fileName, type: photo.mimeType } as never);
+  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+    return { success: false, error: 'Photo upload is not configured.', assignmentUnavailable: false };
+  }
   try {
-    if (__DEV__) console.log('[driver-job-photo] invoking driver-job-photo-upload', {
+    const imageResponse = await fetch(photo.uri);
+    if (!imageResponse.ok) throw new Error(`Unable to read the selected photo (${imageResponse.status}).`);
+    const imageBytes = await imageResponse.arrayBuffer();
+    const actualFileSize = imageBytes.byteLength;
+    const fileSizeError = validatePendingDriverPhoto({ mimeType: photo.mimeType, fileSize: actualFileSize });
+    if (fileSizeError) return { success: false, error: fileSizeError, assignmentUnavailable: false };
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return { success: false, error: 'Your session has expired. Please sign in again.', assignmentUnavailable: false };
+
+    const functionUrl = `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/${DRIVER_PHOTO_UPLOAD_FUNCTION}`;
+    if (__DEV__) console.log('[driver-job-photo] requesting Edge Function', {
+      functionName: DRIVER_PHOTO_UPLOAD_FUNCTION,
+      functionUrl,
       pickupJobId: jobId,
       photoType: photo.photoType,
       mimeType: photo.mimeType,
-      fileName,
-      fileSize: photo.fileSize ?? null,
+      fileSize: actualFileSize,
       uri: photo.uri,
     });
-    const { data, error } = await supabase.functions.invoke('driver-job-photo-upload', { body: formData });
-    if (!error) {
-      if (__DEV__) console.log('[driver-job-photo] upload response', data);
+    const response = await fetch(functionUrl, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': photo.mimeType,
+        'x-pickup-job-id': jobId,
+        'x-photo-type': photo.photoType,
+      },
+      body: imageBytes,
+    });
+    const responseText = await response.text();
+    let responseBody: unknown = responseText || undefined;
+    try { responseBody = responseText ? JSON.parse(responseText) : undefined; } catch { /* retain text response */ }
+    if (response.ok) {
+      if (__DEV__) console.log('[driver-job-photo] Edge Function response', { status: response.status, body: responseBody });
       return { success: true };
     }
-    const functionError = await readFunctionError(error);
-    if (__DEV__) console.error('[driver-job-photo] upload error', functionError);
+    const functionError = {
+      functionName: DRIVER_PHOTO_UPLOAD_FUNCTION,
+      functionUrl,
+      status: response.status,
+      statusText: response.statusText,
+      body: responseBody,
+      message: typeof responseBody === 'object' && responseBody && 'error' in responseBody && typeof responseBody.error === 'string'
+        ? responseBody.error
+        : responseText || `HTTP ${response.status}`,
+    };
+    if (__DEV__) console.error('[driver-job-photo] Edge Function error', functionError);
     const safeError = mapUploadError(functionError.message);
     return { success: false, error: safeError, assignmentUnavailable: safeError.includes('no longer assigned') };
   } catch (error) {
-    if (__DEV__) console.error('[driver-job-photo] invoke threw before a response', serializeError(error));
+    if (__DEV__) console.error('[driver-job-photo] Edge Function request threw before a response', {
+      functionName: DRIVER_PHOTO_UPLOAD_FUNCTION,
+      functionUrl: SUPABASE_URL ? `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/${DRIVER_PHOTO_UPLOAD_FUNCTION}` : null,
+      error: serializeError(error),
+    });
     return { success: false, error: 'No connection. Your photo is ready to retry.', assignmentUnavailable: false };
-  }
-}
-
-async function readFunctionError(error: unknown): Promise<{ name?: string; message?: string; status?: number; statusText?: string; body?: unknown }> {
-  const value = error as { name?: string; message?: string; context?: Response };
-  const response = value.context;
-  if (!response) return { name: value.name, message: value.message };
-  try {
-    const text = await response.clone().text();
-    let body: unknown = text || undefined;
-    try { body = text ? JSON.parse(text) : undefined; } catch { /* retain text response */ }
-    const responseMessage = typeof body === 'object' && body && 'error' in body && typeof body.error === 'string'
-      ? body.error
-      : value.message;
-    return { name: value.name, message: responseMessage, status: response.status, statusText: response.statusText, body };
-  } catch {
-    return { name: value.name, message: value.message, status: response.status, statusText: response.statusText };
   }
 }
 
