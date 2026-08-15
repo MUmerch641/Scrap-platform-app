@@ -53,6 +53,7 @@ export const FormInput = forwardRef<RNTextInput, FormInputProps>(
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const isAndroid = Platform.OS === 'android';
+    const useCompactIOSInput = Platform.OS === 'ios' && props.multiline !== true;
 
     const colors = semanticColors[isDark ? 'dark' : 'light'];
 
@@ -90,6 +91,7 @@ export const FormInput = forwardRef<RNTextInput, FormInputProps>(
         <View
           style={[
             styles.inputWrapper,
+            useCompactIOSInput && styles.inputWrapperCompactIOS,
             useAndroidLightStyle
               ? styles.inputWrapperAndroidLight
               : styles.inputWrapperOutlined,
@@ -121,6 +123,7 @@ export const FormInput = forwardRef<RNTextInput, FormInputProps>(
             ref={inputRef}
             style={[
               styles.input,
+              useCompactIOSInput && styles.inputCompactIOS,
               {
                 color: colors.inputText,
               },
@@ -157,6 +160,7 @@ export const FormInput = forwardRef<RNTextInput, FormInputProps>(
               }
               style={({ pressed }) => [
                 styles.eyeToggle,
+                useCompactIOSInput && styles.eyeToggleCompactIOS,
                 {
                   opacity: pressed
                     ? 0.5
@@ -237,6 +241,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.lg,
   },
+  inputWrapperCompactIOS: {
+    minHeight: 44,
+  },
 
   inputWrapperAndroidLight: {
     borderWidth: 0,
@@ -262,12 +269,20 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.sm,
     fontFamily: typography.fontFamily.body,
   },
+  inputCompactIOS: {
+    minHeight: 44,
+    height: 44,
+  },
 
   eyeToggle: {
     width: 48,
     minHeight: 48,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  eyeToggleCompactIOS: {
+    minHeight: 44,
+    width: 44,
   },
 
   errorText: {
