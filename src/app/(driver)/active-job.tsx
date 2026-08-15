@@ -32,7 +32,7 @@ import { Image } from 'expo-image';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, Modal, Platform, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 
-const ACTIVE_STATUSES = ['en_route', 'arrived', 'material_collected'] as const;
+const ACTIVE_STATUSES = ['assigned', 'en_route', 'arrived', 'material_collected'] as const;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type ScreenState = 'ready' | 'unavailable' | 'conflict' | 'error';
@@ -115,12 +115,19 @@ export default function DriverActiveJobScreen() {
     const id = ++requestId.current;
     setScreenState('ready');
     setTransitionError(null);
-    const result = await fetchDriverJobs({ page: 0, pageSize: 2, jobId, executionStatuses: jobId ? undefined : ACTIVE_STATUSES });
+    const result = await fetchDriverJobs({ page: 0, pageSize: 99, jobId, executionStatuses: jobId ? undefined : ACTIVE_STATUSES });
     if (id !== requestId.current) return;
     if (__DEV__) console.log('[driver-active-job] detail result', { p_job_id: jobId ?? null, success: result.success, jobCount: result.jobs.length, error: result.error, job: result.jobs[0] ?? null });
     if (!result.success) { if (!hasLoadedJobRef.current) setScreenState('error'); setLoading(false); return; }
-    if (result.jobs.length > 1 && !jobId) { setJob(null); hasLoadedJobRef.current = false; setScreenState('conflict'); setLoading(false); return; }
-    const nextJob = result.jobs[0] ?? null;
+    const assignedJobs = result.jobs.filter((candidate) => candidate.executionStatus === 'assigned');
+    if (!jobId && (assignedJobs.length > 1 || (assignedJobs.length === 0 && result.jobs.length > 1))) {
+      setJob(null);
+      hasLoadedJobRef.current = false;
+      setScreenState('conflict');
+      setLoading(false);
+      return;
+    }
+    const nextJob = jobId ? result.jobs[0] ?? null : assignedJobs[0] ?? result.jobs[0] ?? null;
     setJob(nextJob);
     if (nextJob) void refreshPhotos(nextJob.id);
     else setPhotos([]);

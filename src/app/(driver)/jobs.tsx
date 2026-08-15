@@ -123,7 +123,10 @@ export default function DriverJobsScreen() {
     setAvailableJobs((current) => current.filter((job) => job.id !== jobId));
     notifyDriverJobsChanged();
     showInfoMessage(result.alreadyAccepted ? 'This job is already assigned to you.' : 'Job accepted.');
-    router.push({ pathname: '/(driver)/active-job', params: { pickupJobId: result.jobId ?? jobId } });
+    const acceptedPickupJobId = result.jobId ?? jobId;
+    // Keep both keys while the tab route is mounted so the accepted id
+    // survives native-tab navigation and older deep links.
+    router.push({ pathname: '/(driver)/active-job', params: { pickupJobId: acceptedPickupJobId, jobId: acceptedPickupJobId } });
   };
 
   const visibleItems = view === 'available' ? availableJobs : jobs;
