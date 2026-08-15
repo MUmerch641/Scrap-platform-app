@@ -31,3 +31,7 @@ example/
 
 expo-env.d.ts
 # @end expo-cli
+
+
+# services json file firebase
+google-services.json

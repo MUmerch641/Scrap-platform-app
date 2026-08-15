@@ -1,6 +1,7 @@
 import { supabase, supabaseConfigurationError } from '@/services/supabase-client';
 
 import {
+  AvailableDriverJob,
   DriverCoordinate,
   DriverExecutionStatus,
   DriverJob,
@@ -41,6 +42,28 @@ export interface DriverJobSummaryResult {
   error?: string;
 }
 
+export interface AvailableDriverJobPageResult {
+  success: boolean;
+  jobs: AvailableDriverJob[];
+  hasMore: boolean;
+  error?: string;
+}
+
+export type AcceptDriverJobFailure =
+  | 'already-taken'
+  | 'no-approved-vehicle'
+  | 'unauthorized'
+  | 'unavailable';
+
+export interface AcceptDriverJobResult {
+  success: boolean;
+  jobId?: string;
+  assignmentId?: string;
+  alreadyAccepted?: boolean;
+  failure?: AcceptDriverJobFailure;
+  error?: string;
+}
+
 export type DriverJobTransitionFailure = 'assignment-unavailable' | 'invalid-transition' | 'unavailable';
 
 export interface DriverJobTransitionResult {
@@ -65,7 +88,9 @@ interface RawDriverJob {
   execution_status: DriverExecutionStatus;
   scheduled_at: string | null;
   customer_name: string;
+  contact_person: string | null;
   customer_phone: string;
+  customer_email: string | null;
   pickup_address: string;
   pickup_latitude?: number | string | null;
   pickup_longitude?: number | string | null;
@@ -84,6 +109,15 @@ interface RawDriverJob {
   arrived_at: string | null;
   material_collected_at: string | null;
   delivered_to_yard_at: string | null;
+}
+
+interface RawAvailableDriverJob {
+  id: string;
+  scheduled_at: string;
+  pickup_area: string | null;
+  material_type: string;
+  estimated_weight: number | string | null;
+  available_at: string;
 }
 
 function mapPickupCoordinate(row: RawDriverJob): DriverCoordinate | null {
@@ -117,7 +151,9 @@ function mapJob(row: RawDriverJob): DriverJob {
     executionStatus: row.execution_status,
     scheduledAt: row.scheduled_at,
     customerName: row.customer_name,
+    contactPerson: row.contact_person,
     customerPhone: row.customer_phone,
+    customerEmail: row.customer_email,
     pickupAddress: row.pickup_address,
     pickupCoordinate: mapPickupCoordinate(row),
     materialType: row.material_type,
@@ -136,6 +172,17 @@ function mapJob(row: RawDriverJob): DriverJob {
     arrivedAt: row.arrived_at,
     materialCollectedAt: row.material_collected_at,
     deliveredToYardAt: row.delivered_to_yard_at,
+  };
+}
+
+function mapAvailableJob(row: RawAvailableDriverJob): AvailableDriverJob {
+  return {
+    id: row.id,
+    scheduledAt: row.scheduled_at,
+    pickupArea: row.pickup_area,
+    materialType: row.material_type,
+    estimatedWeight: row.estimated_weight == null ? null : Number(row.estimated_weight),
+    availableAt: row.available_at,
   };
 }
 
@@ -251,6 +298,84 @@ export async function fetchDriverJobs(options: DriverJobPageOptions): Promise<Dr
     return { success: true, jobs: rows.slice(0, pageSize).map(mapJob), hasMore: rows.length > pageSize };
   } catch {
     return { success: false, jobs: [], hasMore: false, error: 'Unable to connect to service. Check your connection and try again.' };
+  }
+}
+
+export async function fetchAvailableDriverJobs(
+  page = 0,
+  pageSize = DRIVER_JOB_PAGE_SIZE,
+): Promise<AvailableDriverJobPageResult> {
+  if (supabaseConfigurationError) {
+    return { success: false, jobs: [], hasMore: false, error: supabaseConfigurationError };
+  }
+
+  const safePage = Math.max(0, Math.trunc(page));
+  const safePageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Math.trunc(pageSize)));
+
+  try {
+    const { data, error } = await supabase.rpc('get_available_driver_jobs', {
+      p_limit: safePageSize + 1,
+      p_offset: safePage * safePageSize,
+    });
+    if (error) {
+      return { success: false, jobs: [], hasMore: false, error: mapError('load available jobs', error) };
+    }
+    const rows = (data ?? []) as RawAvailableDriverJob[];
+    return {
+      success: true,
+      jobs: rows.slice(0, safePageSize).map(mapAvailableJob),
+      hasMore: rows.length > safePageSize,
+    };
+  } catch {
+    return { success: false, jobs: [], hasMore: false, error: 'Unable to connect to service. Check your connection and try again.' };
+  }
+}
+
+export async function acceptDriverJob(jobId: string): Promise<AcceptDriverJobResult> {
+  if (supabaseConfigurationError) return { success: false, error: supabaseConfigurationError };
+
+  try {
+    const { data, error } = await supabase.rpc('accept_driver_job', { p_job_id: jobId });
+    if (error) {
+      const message = error.message?.toLowerCase() ?? '';
+      if (message.includes('no valid pre-approved vehicle')) {
+        return {
+          success: false,
+          failure: 'no-approved-vehicle',
+          error: 'No active pre-approved vehicle is linked to your Driver account. Contact Operations.',
+        };
+      }
+      if (message.includes('no longer available')) {
+        return {
+          success: false,
+          failure: 'already-taken',
+          error: 'This job has already been accepted by another driver.',
+        };
+      }
+      if (error.code === '42501' || message.includes('not authorized')) {
+        return { success: false, failure: 'unauthorized', error: 'Driver access is no longer available.' };
+      }
+      if (__DEV__) console.warn('[driver-job-service] accept job failed', { code: error.code });
+      return { success: false, failure: 'unavailable', error: 'Unable to accept this job. Refresh and try again.' };
+    }
+
+    const accepted = (data?.[0] ?? null) as {
+      pickup_job_id?: string;
+      pickup_job_assignment_id?: string;
+      already_accepted?: boolean;
+    } | null;
+    if (!accepted?.pickup_job_id || !accepted.pickup_job_assignment_id) {
+      return { success: false, failure: 'unavailable', error: 'Unable to confirm job acceptance. Refresh and try again.' };
+    }
+
+    return {
+      success: true,
+      jobId: accepted.pickup_job_id,
+      assignmentId: accepted.pickup_job_assignment_id,
+      alreadyAccepted: accepted.already_accepted ?? false,
+    };
+  } catch {
+    return { success: false, error: 'Unable to accept this job. Check your connection and try again.' };
   }
 }
 

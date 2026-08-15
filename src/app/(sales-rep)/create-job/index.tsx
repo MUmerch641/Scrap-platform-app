@@ -1,4 +1,5 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { DateTimePicker } from '@expo/ui/community/datetime-picker';
 import { BottomSheet, BottomSheetView } from '@expo/ui/community/bottom-sheet';
 import React, { useCallback, useRef, useState } from 'react';
@@ -40,6 +41,7 @@ import { useNetworkStatus } from '@/context/NetworkStatusContext';
 import { SearchField } from '@/components/ui/search-field';
 import {
   Customer,
+  fetchCustomerById,
   fetchCustomersPage,
 } from '@/services/customer-service';
 import {
@@ -50,10 +52,16 @@ import {
   createPickupRequest,
   findPickupByClientRequestId,
   formatLocalCalendarDate,
+  AUSTRALIAN_STATE_OPTIONS,
   MATERIAL_OPTIONS,
   parseEstimatedWeightInput,
   validatePickupRequestInput,
 } from '@/services/pickup-service';
+import {
+  PendingSalesRepPickupPhoto,
+  uploadSalesRepPickupPhoto,
+  validatePendingSalesRepPickupPhoto,
+} from '@/services/sales-rep-pickup-photo-service';
 import { createClientRequestId } from '@/shared/client-request-id';
 import { radius, semanticColors, spacing, typography } from '@/shared/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -584,6 +592,13 @@ type CustomerAvailability = 'loading' | 'available' | 'empty' | 'error';
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function CreatePickupScreen() {
   const router      = useRouter();
+  const { customerId, pickupAddress: reuseAddress, pickupSuburb: reuseSuburb, pickupState: reuseState, pickupPostcode: reusePostcode } = useLocalSearchParams<{
+    customerId?: string;
+    pickupAddress?: string;
+    pickupSuburb?: string;
+    pickupState?: string;
+    pickupPostcode?: string;
+  }>();
   const colorScheme = useColorScheme();
   const isDark      = colorScheme === 'dark';
   const colors      = getColors(isDark);
@@ -596,14 +611,26 @@ export default function CreatePickupScreen() {
     useState<CustomerAvailability>('loading');
   const [checkingCustomers, setCheckingCustomers] = useState(false);
   const customerAvailabilityRequestRef = useRef(0);
+  const preloadedCustomerIdRef = useRef<string | null>(null);
 
   // Form state
   const [pickupAddress,   setPickupAddress]   = useState('');
+  const [pickupSuburb,    setPickupSuburb]    = useState('');
+  const [pickupState,     setPickupState]     = useState('');
+  const [pickupPostcode,  setPickupPostcode]  = useState('');
   const [requestedDate,   setRequestedDate]   = useState(getTodayString());
   const [requestedTime,   setRequestedTime]   = useState('09:00');
   const [materialType,    setMaterialType]    = useState('Copper');
+  const [materialDescription, setMaterialDescription] = useState('');
   const [estimatedWeight, setEstimatedWeight] = useState('');
+  const [siteAccessInstructions, setSiteAccessInstructions] = useState('');
+  const [loadingRequirements, setLoadingRequirements] = useState('');
+  const [deliveryYardName, setDeliveryYardName] = useState('');
+  const [leadSource, setLeadSource] = useState('');
+  const [internalNotes, setInternalNotes] = useState('');
   const [notes,           setNotes]           = useState('');
+  const [pendingPhotos, setPendingPhotos] = useState<PendingSalesRepPickupPhoto[]>([]);
+  const [submittedPickupId, setSubmittedPickupId] = useState<string | null>(null);
   const [submitting,      setSubmitting]      = useState(false);
   const [formError,       setFormError]       = useState<string | null>(null);
   const [activeIOSPicker, setActiveIOSPicker] = useState<IOSPickerMode | null>(null);
@@ -664,6 +691,26 @@ export default function CreatePickupScreen() {
     }, [checkCustomers])
   );
 
+  React.useEffect(() => {
+    const normalizedCustomerId = customerId?.trim();
+    if (!normalizedCustomerId || preloadedCustomerIdRef.current === normalizedCustomerId) return;
+    preloadedCustomerIdRef.current = normalizedCustomerId;
+
+    const preload = async () => {
+      const result = await fetchCustomerById(normalizedCustomerId);
+      if (!result.success || !result.customer) {
+        setFormError(result.error ?? 'This customer is no longer available.');
+        return;
+      }
+      setSelectedCustomer(result.customer);
+      setPickupAddress(reuseAddress?.trim() || result.customer.address);
+      setPickupSuburb(reuseSuburb?.trim() || '');
+      setPickupState(reuseState?.trim() || '');
+      setPickupPostcode(reusePostcode?.trim() || '');
+    };
+    void preload();
+  }, [customerId, reuseAddress, reusePostcode, reuseState, reuseSuburb]);
+
   const handleCustomerSelected = (customer: Customer) => {
     setSelectedCustomer(customer);
     setPickupAddress(customer.address);
@@ -671,8 +718,103 @@ export default function CreatePickupScreen() {
     setSelectorVisible(false);
   };
 
+  const uploadPhotosForPickup = useCallback(async (
+    pickupRequestId: string,
+    photos: PendingSalesRepPickupPhoto[],
+  ): Promise<boolean> => {
+    if (photos.length === 0) return true;
+
+    const results = await Promise.all(photos.map(async (photo) => {
+      setPendingPhotos((current) => current.map((item) => (
+        item.id === photo.id ? { ...item, status: 'uploading', error: undefined } : item
+      )));
+      const result = await uploadSalesRepPickupPhoto(pickupRequestId, photo);
+      return { photo, result };
+    }));
+
+    setPendingPhotos((current) => current.flatMap((item) => {
+      const outcome = results.find((result) => result.photo.id === item.id);
+      if (!outcome) return [item];
+      if (outcome.result.success) return [];
+      return [{
+        ...item,
+        status: 'failed' as const,
+        error: outcome.result.error,
+        remotePhotoId: outcome.result.photoId ?? item.remotePhotoId,
+        storagePath: outcome.result.storagePath ?? item.storagePath,
+      }];
+    }));
+
+    return results.every(({ result }) => result.success);
+  }, []);
+
+  const selectPhoto = useCallback(async (source: 'camera' | 'library') => {
+    const permission = source === 'camera'
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      showErrorMessage(
+        source === 'camera'
+          ? 'Camera access is needed to take a scrap photo.'
+          : 'Photo library access is needed to choose a scrap photo.',
+        'Permission needed',
+      );
+      return;
+    }
+
+    const options: ImagePicker.ImagePickerOptions = {
+      mediaTypes: ['images'],
+      allowsEditing: false,
+      quality: 0.85,
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+      ...(source === 'camera' ? { cameraType: ImagePicker.CameraType.back } : {}),
+    };
+    const result = source === 'camera'
+      ? await ImagePicker.launchCameraAsync(options)
+      : await ImagePicker.launchImageLibraryAsync(options);
+    if (result.canceled || !result.assets[0]) return;
+
+    const asset = result.assets[0];
+    if (asset.mimeType !== 'image/jpeg' && asset.mimeType !== 'image/png') {
+      showErrorMessage('Choose a JPEG or PNG photo. iPhone photos should be shared in a compatible format.', 'Unsupported photo');
+      return;
+    }
+    const photo: PendingSalesRepPickupPhoto = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      uri: asset.uri,
+      mimeType: asset.mimeType,
+      fileSize: asset.fileSize ?? undefined,
+      status: 'ready',
+    };
+    const validationError = validatePendingSalesRepPickupPhoto(photo);
+    if (validationError) {
+      showErrorMessage(validationError, 'Unsupported photo');
+      return;
+    }
+    setPendingPhotos((current) => [...current, photo]);
+  }, []);
+
   const handleSubmit = async () => {
     if (isSubmittingRef.current || submitting) return;
+
+    if (submittedPickupId) {
+      isSubmittingRef.current = true;
+      setFormError(null);
+      setSubmitting(true);
+      try {
+        const uploaded = await uploadPhotosForPickup(submittedPickupId, pendingPhotos);
+        if (!uploaded) {
+          setFormError('Pickup request was submitted, but one or more scrap photos failed. Tap Retry Uploads to try again.');
+          return;
+        }
+        showInfoMessage('Pickup request submitted successfully');
+        router.push('/(sales-rep)/(home)');
+      } finally {
+        isSubmittingRef.current = false;
+        setSubmitting(false);
+      }
+      return;
+    }
 
     if (!selectedCustomer) {
       setFormError('Please select a customer.');
@@ -688,10 +830,19 @@ export default function CreatePickupScreen() {
     const validation = validatePickupRequestInput({
       customerId: selectedCustomer.id,
       pickupAddress,
+      pickupSuburb,
+      pickupState,
+      pickupPostcode,
       requestedDate,
       requestedTime,
       materialType,
+      materialDescription,
       estimatedWeight: weightResult.value,
+      siteAccessInstructions,
+      loadingRequirements,
+      deliveryYardName,
+      leadSource,
+      internalNotes,
       notes,
     });
     if (!validation.success) {
@@ -740,6 +891,14 @@ export default function CreatePickupScreen() {
 
       if (result.success) {
         pickupAttemptRef.current = null;
+        if (pendingPhotos.length > 0 && result.request) {
+          setSubmittedPickupId(result.request.id);
+          const uploaded = await uploadPhotosForPickup(result.request.id, pendingPhotos);
+          if (!uploaded) {
+            setFormError('Pickup request was submitted, but one or more scrap photos failed. Tap Retry Uploads to try again.');
+            return;
+          }
+        }
         showInfoMessage('Pickup request submitted successfully');
         router.push('/(sales-rep)/(home)');
       } else {
@@ -828,7 +987,7 @@ export default function CreatePickupScreen() {
           </FadeSlide>
         ) : null}
 
-        {/* Customer selector */}
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Customer</Text>
         <FormCard delay={0 * STAGGER_MS}>
           <CustomerSelectorField
             selected={selectedCustomer}
@@ -837,7 +996,7 @@ export default function CreatePickupScreen() {
           />
         </FormCard>
 
-        {/* Pickup Address */}
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Pickup Location</Text>
         <FormCard delay={1 * STAGGER_MS}>
           <FormInput
             label="Pickup Address *"
@@ -849,8 +1008,86 @@ export default function CreatePickupScreen() {
           />
         </FormCard>
 
-        {/* Requested Date */}
         <FormCard delay={2 * STAGGER_MS}>
+          <View style={styles.fieldBlock}>
+            <FormInput
+              label="Pickup Suburb *"
+              value={pickupSuburb}
+              onChangeText={setPickupSuburb}
+              autoCapitalize="words"
+              placeholder="e.g. South Wharf"
+            />
+            <FormInput
+              label="State / Territory *"
+              value={pickupState}
+              editable={false}
+              placeholder="Choose below"
+            />
+            <View style={styles.presetRow}>
+              {AUSTRALIAN_STATE_OPTIONS.map((state) => (
+                <Pressable key={state} onPress={() => setPickupState(state)} hitSlop={10}
+                  style={[styles.presetChip, {
+                    borderColor: pickupState === state ? colors.accent : colors.border,
+                    backgroundColor: pickupState === state ? colors.accent : 'transparent',
+                  }]}>
+                  <Text style={[styles.presetText, { color: pickupState === state ? colors.onPrimary : colors.textMuted }]}>{state}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <FormInput
+              label="Postcode *"
+              value={pickupPostcode}
+              onChangeText={setPickupPostcode}
+              keyboardType="numbers-and-punctuation"
+              placeholder="e.g. 3006"
+            />
+          </View>
+        </FormCard>
+
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Material</Text>
+        <FormCard delay={3 * STAGGER_MS}>
+          <View style={styles.fieldBlock}>
+            <FormInput
+              label="Material Category *"
+              value={materialType}
+              editable={false}
+              placeholder="Choose below"
+            />
+            <View style={styles.presetRow}>
+              {MATERIAL_OPTIONS.map((m) => (
+                <Pressable key={m} onPress={() => setMaterialType(m)} hitSlop={10}
+                  style={[styles.presetChip, {
+                    borderColor: materialType === m ? colors.accent : colors.border,
+                    backgroundColor: materialType === m ? colors.accent : 'transparent',
+                  }]}>
+                  <Text style={[styles.presetText, { color: materialType === m ? colors.onPrimary : colors.textMuted }]}>{m}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <FormInput label="Material Description (Optional)" value={materialDescription} onChangeText={setMaterialDescription} multiline numberOfLines={3} placeholder="Describe grade, condition, or items" />
+            <FormInput label="Estimated Weight or Quantity (Optional, kg)" value={estimatedWeight} onChangeText={setEstimatedWeight} keyboardType="decimal-pad" showDoneAccessory placeholder="e.g. 500" />
+          </View>
+        </FormCard>
+
+        <FormCard delay={4 * STAGGER_MS}>
+          <View style={styles.fieldBlock}>
+            <Text style={[styles.fieldLabel, { color: colors.text }]}>Scrap Photos (Optional)</Text>
+            <Text style={[styles.helpText, { color: colors.textMuted }]}>Photos upload after the pickup request is created. Failed uploads stay here so you can retry.</Text>
+            <View style={styles.photoActions}>
+              <Button title="Take Photo" variant="secondary" onPress={() => void selectPhoto('camera')} disabled={submitting || submittedPickupId !== null} />
+              <Button title="Choose Photo" variant="secondary" onPress={() => void selectPhoto('library')} disabled={submitting || submittedPickupId !== null} />
+            </View>
+            {pendingPhotos.map((photo, index) => (
+              <View key={photo.id} style={[styles.photoRow, { borderColor: colors.border }]}>
+                <Text style={[styles.photoName, { color: colors.text }]}>Scrap photo {index + 1}</Text>
+                <Text style={[styles.photoStatus, { color: photo.status === 'failed' ? colors.danger : colors.textMuted }]}>{photo.status === 'failed' ? photo.error ?? 'Upload failed' : photo.status === 'uploading' ? 'Uploading…' : 'Ready to upload'}</Text>
+              </View>
+            ))}
+          </View>
+        </FormCard>
+
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Pickup Timing</Text>
+        <FormCard delay={3 * STAGGER_MS}>
           <View style={styles.fieldBlock}>
             {Platform.OS === 'ios' ? (
               <IOSPickerField
@@ -882,8 +1119,7 @@ export default function CreatePickupScreen() {
           </View>
         </FormCard>
 
-        {/* Requested Time */}
-        <FormCard delay={3 * STAGGER_MS}>
+        <FormCard delay={4 * STAGGER_MS}>
           <View style={styles.fieldBlock}>
             {Platform.OS === 'ios' ? (
               <IOSPickerField
@@ -917,60 +1153,28 @@ export default function CreatePickupScreen() {
           </View>
         </FormCard>
 
-        {/* Material Type */}
-        <FormCard delay={4 * STAGGER_MS}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Site / Loading</Text>
+        <FormCard delay={5 * STAGGER_MS}>
           <View style={styles.fieldBlock}>
-            <FormInput
-              label="Material Type *"
-              value={materialType}
-              onChangeText={setMaterialType}
-              placeholder="e.g. Copper, Brass, Heavy Iron"
-            />
-            <View style={styles.presetRow}>
-              {MATERIAL_OPTIONS.map((m) => (
-                <Pressable key={m} onPress={() => setMaterialType(m)}
-                  hitSlop={10}
-                  style={[styles.presetChip, {
-                    borderColor:     materialType === m ? colors.accent : colors.border,
-                    backgroundColor: materialType === m ? colors.accent : 'transparent',
-                  }]}>
-                  <Text style={[styles.presetText, {
-                    color: materialType === m ? colors.onPrimary : colors.textMuted,
-                  }]}>{m}</Text>
-                </Pressable>
-              ))}
-            </View>
+            <FormInput label="Site Access Instructions (Optional)" value={siteAccessInstructions} onChangeText={setSiteAccessInstructions} multiline numberOfLines={3} placeholder="Gate access, contact on arrival, access code" />
+            <FormInput label="Loading Requirements (Optional)" value={loadingRequirements} onChangeText={setLoadingRequirements} multiline numberOfLines={3} placeholder="Forklift, loading dock, manual handling" />
+            <FormInput label="Special Instructions (Optional)" value={notes} onChangeText={setNotes} multiline numberOfLines={3} placeholder="Anything the Operations team should know" />
           </View>
         </FormCard>
 
-        {/* Estimated Weight */}
-        <FormCard delay={5 * STAGGER_MS}>
-          <FormInput
-            label="Estimated Weight (Optional, kg)"
-            value={estimatedWeight}
-            onChangeText={setEstimatedWeight}
-            keyboardType="decimal-pad"
-            showDoneAccessory
-            placeholder="e.g. 500"
-          />
-        </FormCard>
-
-        {/* Notes */}
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Delivery / Internal</Text>
         <FormCard delay={6 * STAGGER_MS}>
-          <FormInput
-            label="Notes (Optional)"
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            numberOfLines={3}
-            placeholder="Access code, loading dock details, site instructions..."
-          />
+          <View style={styles.fieldBlock}>
+            <FormInput label="Delivery Yard (Optional)" value={deliveryYardName} onChangeText={setDeliveryYardName} placeholder="Yard name, if known" />
+            <FormInput label="Lead Source (Optional)" value={leadSource} onChangeText={setLeadSource} placeholder="e.g. referral, web, repeat customer" />
+            <FormInput label="Internal Notes (Optional)" value={internalNotes} onChangeText={setInternalNotes} multiline numberOfLines={3} placeholder="Internal Operations notes" />
+          </View>
         </FormCard>
 
         {/* Submit */}
         <FadeSlide delay={7 * STAGGER_MS}>
           <Button
-            title="Submit Pickup Request"
+            title={submittedPickupId ? 'Retry Uploads' : 'Submit Pickup Request'}
             onPress={() => void handleSubmit()}
             loading={submitting}
             disabled={submitting}
@@ -1023,6 +1227,33 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.xs,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  sectionTitle: {
+    fontFamily: typography.fontFamily.heading,
+    fontSize: typography.fontSize.md,
+    marginTop: spacing.sm,
+  },
+  helpText: {
+    fontFamily: typography.fontFamily.body,
+    fontSize: typography.fontSize.xs,
+    lineHeight: 17,
+  },
+  photoActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  photoRow: {
+    borderTopWidth: 1,
+    paddingTop: spacing.sm,
+    gap: 2,
+  },
+  photoName: {
+    fontFamily: typography.fontFamily.bodyMedium,
+    fontSize: typography.fontSize.sm,
+  },
+  photoStatus: {
+    fontFamily: typography.fontFamily.body,
+    fontSize: typography.fontSize.xs,
   },
 
   // ── Selector trigger ───────────────────────────────────────────────────────

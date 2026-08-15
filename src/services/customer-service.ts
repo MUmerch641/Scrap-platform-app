@@ -2,11 +2,31 @@ import { supabase, supabaseConfigurationError } from '@/services/supabase-client
 
 export const CUSTOMER_FIELD_LIMITS = {
   name: 120,
+  contactPerson: 120,
   phone: 32,
   email: 254,
   address: 300,
+  billingAddress: 300,
+  abn: 32,
   notes: 1000,
 } as const;
+
+export const CUSTOMER_TYPE_OPTIONS = ['business', 'residential', 'other'] as const;
+export const PREFERRED_CONTACT_METHOD_OPTIONS = ['phone', 'sms', 'email'] as const;
+export const CUSTOMER_STATUS_OPTIONS = [
+  'new_lead',
+  'contacted',
+  'interested',
+  'active_customer',
+  'follow_up_required',
+  'inactive',
+  'not_interested',
+  'do_not_contact',
+] as const;
+
+export type CustomerType = (typeof CUSTOMER_TYPE_OPTIONS)[number];
+export type PreferredContactMethod = (typeof PREFERRED_CONTACT_METHOD_OPTIONS)[number];
+export type CustomerStatus = (typeof CUSTOMER_STATUS_OPTIONS)[number];
 
 const MAX_CUSTOMER_PAGE_SIZE = 100;
 const MEANINGFUL_TEXT_PATTERN = /[\p{L}\p{N}]/u;
@@ -27,9 +47,15 @@ export interface Customer {
   id: string;
   createdBy: string;
   name: string;
+  contactPerson: string | null;
   phone: string;
   email: string | null;
   address: string;
+  customerType: CustomerType;
+  billingAddress: string | null;
+  abn: string | null;
+  preferredContactMethod: PreferredContactMethod | null;
+  customerStatus: CustomerStatus;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -37,17 +63,43 @@ export interface Customer {
 
 export interface CreateCustomerInput {
   name: string;
+  contactPerson?: string | null;
   phone: string;
   email?: string | null;
   address: string;
+  customerType?: CustomerType;
+  billingAddress?: string | null;
+  abn?: string | null;
+  preferredContactMethod?: PreferredContactMethod | null;
+  customerStatus?: CustomerStatus;
   notes?: string | null;
 }
 
 interface NormalizedCustomerInput {
   name: string;
+  contactPerson: string | null;
   phone: string;
   email: string | null;
   address: string;
+  customerType: CustomerType;
+  billingAddress: string | null;
+  abn: string | null;
+  preferredContactMethod: PreferredContactMethod | null;
+  customerStatus: CustomerStatus;
+  notes: string | null;
+}
+
+interface CustomerWritePayload {
+  name: string;
+  contact_person: string | null;
+  phone: string;
+  email: string | null;
+  address: string;
+  customer_type: CustomerType;
+  billing_address: string | null;
+  abn: string | null;
+  preferred_contact_method: PreferredContactMethod | null;
+  customer_status: CustomerStatus;
   notes: string | null;
 }
 
@@ -63,7 +115,13 @@ export interface FetchCustomersPageResult {
   error?: string;
 }
 
-export interface FindCustomerByPhoneResult {
+export interface FindLikelyCustomerResult {
+  success: boolean;
+  customer?: Customer;
+  error?: string;
+}
+
+export interface FetchCustomerResult {
   success: boolean;
   customer?: Customer;
   error?: string;
@@ -91,28 +149,56 @@ interface RawCustomerRow {
   id: string;
   created_by: string;
   name: string;
+  contact_person: string | null;
   phone: string;
   email: string | null;
   address: string;
+  customer_type: CustomerType;
+  billing_address: string | null;
+  abn: string | null;
+  preferred_contact_method: PreferredContactMethod | null;
+  customer_status: CustomerStatus;
   notes: string | null;
   created_at: string;
   updated_at: string;
 }
 
 const CUSTOMER_COLUMNS =
-  'id, created_by, name, phone, email, address, notes, created_at, updated_at';
+  'id, created_by, name, contact_person, phone, email, address, customer_type, billing_address, abn, preferred_contact_method, customer_status, notes, created_at, updated_at';
 
 function mapRowToCustomer(row: RawCustomerRow): Customer {
   return {
     id: row.id,
     createdBy: row.created_by,
     name: row.name,
+    contactPerson: row.contact_person,
     phone: row.phone,
     email: row.email,
     address: row.address,
+    customerType: row.customer_type,
+    billingAddress: row.billing_address,
+    abn: row.abn,
+    preferredContactMethod: row.preferred_contact_method,
+    customerStatus: row.customer_status,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function toCustomerWritePayload(input: NormalizedCustomerInput): CustomerWritePayload {
+  return {
+    name: input.name,
+    contact_person: input.contactPerson,
+    phone: input.phone,
+    email: input.email,
+    address: input.address,
+    customer_type: input.customerType,
+    billing_address: input.billingAddress,
+    abn: input.abn,
+    preferred_contact_method: input.preferredContactMethod,
+    customer_status: input.customerStatus,
+    notes: input.notes,
   };
 }
 
@@ -128,9 +214,15 @@ export function validateCustomerInput(
   input: CreateCustomerInput,
 ): CustomerValidationResult {
   const name = normalizeWhitespace(input.name);
+  const contactPerson = normalizeWhitespace(input.contactPerson ?? '') || null;
   const phone = normalizeCustomerPhone(input.phone);
   const email = input.email?.trim().toLowerCase() || null;
   const address = normalizeWhitespace(input.address);
+  const billingAddress = normalizeWhitespace(input.billingAddress ?? '') || null;
+  const abn = normalizeWhitespace(input.abn ?? '') || null;
+  const customerType = input.customerType ?? 'business';
+  const preferredContactMethod = input.preferredContactMethod ?? null;
+  const customerStatus = input.customerStatus ?? 'new_lead';
   const notes = input.notes?.trim() || null;
 
   if (!name) return { success: false, error: 'Customer name is required.' };
@@ -142,6 +234,9 @@ export function validateCustomerInput(
       success: false,
       error: `Customer name must be ${CUSTOMER_FIELD_LIMITS.name} characters or fewer.`,
     };
+  }
+  if (contactPerson && contactPerson.length > CUSTOMER_FIELD_LIMITS.contactPerson) {
+    return { success: false, error: `Contact person must be ${CUSTOMER_FIELD_LIMITS.contactPerson} characters or fewer.` };
   }
 
   if (!phone) return { success: false, error: 'Customer phone is required.' };
@@ -185,6 +280,27 @@ export function validateCustomerInput(
     };
   }
 
+  if (billingAddress && billingAddress.length > CUSTOMER_FIELD_LIMITS.billingAddress) {
+    return { success: false, error: `Billing address must be ${CUSTOMER_FIELD_LIMITS.billingAddress} characters or fewer.` };
+  }
+  if (abn) {
+    if (abn.length > CUSTOMER_FIELD_LIMITS.abn) {
+      return { success: false, error: `ABN must be ${CUSTOMER_FIELD_LIMITS.abn} characters or fewer.` };
+    }
+    if (!/^\d{11}$/.test(abn.replace(/\s/g, ''))) {
+      return { success: false, error: 'ABN must contain 11 digits when supplied.' };
+    }
+  }
+  if (!CUSTOMER_TYPE_OPTIONS.includes(customerType)) {
+    return { success: false, error: 'Select a valid customer type.' };
+  }
+  if (preferredContactMethod && !PREFERRED_CONTACT_METHOD_OPTIONS.includes(preferredContactMethod)) {
+    return { success: false, error: 'Select a valid preferred contact method.' };
+  }
+  if (!CUSTOMER_STATUS_OPTIONS.includes(customerStatus)) {
+    return { success: false, error: 'Select a valid customer status.' };
+  }
+
   if (notes && notes.length > CUSTOMER_FIELD_LIMITS.notes) {
     return {
       success: false,
@@ -194,7 +310,7 @@ export function validateCustomerInput(
 
   return {
     success: true,
-    value: { name, phone, email, address, notes },
+    value: { name, contactPerson, phone, email, address, customerType, billingAddress, abn, preferredContactMethod, customerStatus, notes },
   };
 }
 
@@ -202,7 +318,7 @@ function quotePostgrestValue(value: string): string {
   return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
-/** Fetch one bounded page with optional server-side name, phone, and email search. */
+/** Fetch one bounded page with optional server-side name, contact, phone, and email search. */
 export async function fetchCustomersPage(
   search: string,
   page: number,
@@ -235,7 +351,7 @@ export async function fetchCustomersPage(
     if (normalizedSearch) {
       const pattern = quotePostgrestValue(`%${normalizedSearch}%`);
       query = query.or(
-        `name.ilike.${pattern},phone.ilike.${pattern},email.ilike.${pattern}`,
+        `name.ilike.${pattern},contact_person.ilike.${pattern},phone.ilike.${pattern},email.ilike.${pattern}`,
       );
     }
 
@@ -268,23 +384,55 @@ export async function fetchCustomersPage(
   }
 }
 
-/** Finds an exact, normalized phone match so the UI can warn without blocking it. */
-export async function findCustomerByPhone(
-  phone: string,
+/** Fetches one customer through existing owner-scoped RLS. */
+export async function fetchCustomerById(customerId: string): Promise<FetchCustomerResult> {
+  if (supabaseConfigurationError) return { success: false, error: supabaseConfigurationError };
+  if (!UUID_PATTERN.test(customerId.trim())) return { success: true };
+
+  try {
+    const { data, error } = await supabase
+      .from('customers')
+      .select(CUSTOMER_COLUMNS)
+      .eq('id', customerId.trim())
+      .maybeSingle();
+    if (error) {
+      logCustomerDatabaseError('load customer', error);
+      return { success: false, error: 'Unable to load customer. Please try again.' };
+    }
+    return { success: true, customer: data ? mapRowToCustomer(data as RawCustomerRow) : undefined };
+  } catch {
+    return { success: false, error: 'Unable to connect to service. Check network.' };
+  }
+}
+
+/**
+ * Finds one accessible possible match for a non-blocking duplicate suggestion.
+ * Phone and email use exact normalized values; a business name match is only a
+ * prompt to inspect the record, never a uniqueness rule.
+ */
+export async function findLikelyExistingCustomer(
+  input: Pick<CreateCustomerInput, 'name' | 'phone' | 'email'>,
   excludeCustomerId?: string,
-): Promise<FindCustomerByPhoneResult> {
+): Promise<FindLikelyCustomerResult> {
   if (supabaseConfigurationError) {
     return { success: false, error: supabaseConfigurationError };
   }
 
-  const normalizedPhone = normalizeCustomerPhone(phone);
-  if (!normalizedPhone) return { success: true };
+  const normalizedPhone = normalizeCustomerPhone(input.phone);
+  const normalizedEmail = input.email?.trim().toLowerCase() ?? '';
+  const normalizedName = normalizeWhitespace(input.name);
+  const filters = [
+    normalizedPhone ? `phone.eq.${quotePostgrestValue(normalizedPhone)}` : null,
+    normalizedEmail ? `email.eq.${quotePostgrestValue(normalizedEmail)}` : null,
+    normalizedName ? `name.ilike.${quotePostgrestValue(normalizedName)}` : null,
+  ].filter((value): value is string => Boolean(value));
+  if (!filters.length) return { success: true };
 
   try {
     let query = supabase
       .from('customers')
       .select(CUSTOMER_COLUMNS)
-      .eq('phone', normalizedPhone)
+      .or(filters.join(','))
       .order('created_at', { ascending: true })
       .limit(1);
 
@@ -304,7 +452,7 @@ export async function findCustomerByPhone(
       customer: data ? mapRowToCustomer(data as RawCustomerRow) : undefined,
     };
   } catch {
-    return { success: false, error: 'Unable to check customer phone.' };
+    return { success: false, error: 'Unable to check existing customers.' };
   }
 }
 
@@ -370,7 +518,7 @@ export async function createCustomer(
       .insert({
         created_by: userData.user.id,
         client_request_id: clientRequestId,
-        ...validation.value,
+        ...toCustomerWritePayload(validation.value),
       })
       .select(CUSTOMER_COLUMNS)
       .single();
@@ -418,7 +566,7 @@ export async function updateCustomer(
 
     const { data, error } = await supabase
       .from('customers')
-      .update(validation.value)
+      .update(toCustomerWritePayload(validation.value))
       .eq('id', normalizedCustomerId)
       .eq('created_by', userData.user.id)
       .select(CUSTOMER_COLUMNS)

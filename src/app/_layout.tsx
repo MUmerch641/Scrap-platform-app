@@ -14,12 +14,14 @@ import React from 'react';
 import { useColorScheme } from 'react-native';
 
 import { UserRoleProvider } from '@/context/UserRoleContext';
+import { PushNotificationManager } from '@/components/notifications/push-notification-manager';
 import { AppDialogProvider } from '@/context/AppDialogContext';
 import { NetworkStatusProvider } from '@/context/NetworkStatusContext';
 import { AuthGate } from '@/components/auth/auth-gate';
 import { OfflineBanner } from '@/components/ui/offline-banner';
 import { IOSFeedbackToast } from '@/components/ui/ios-feedback-toast';
 import { semanticColors } from '@/shared/theme';
+import '@/services/notification-service';
 
 void SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 400, fade: true });
@@ -75,6 +77,7 @@ export default function Layout() {
   return (
     <UserRoleProvider>
       <ThemeProvider value={navigationTheme}>
+        <PushNotificationManager />
         <AppDialogProvider>
           <NetworkStatusProvider>
             <StatusBar style={isDark ? 'light' : 'dark'} />

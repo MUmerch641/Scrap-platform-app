@@ -182,13 +182,37 @@ export default function DriverActiveJobScreen() {
   const callCustomer = async () => {
     if (!job) return;
     const phone = job.customerPhone.replace(/[^\d+]/g, '');
-    if (!phone) return;
+    if (!phone) { showErrorMessage('This customer does not have a usable phone number.', 'Call unavailable'); return; }
     try {
       const url = `tel:${phone}`;
-      if (await Linking.canOpenURL(url)) await Linking.openURL(url);
+      if (!(await Linking.canOpenURL(url))) { showErrorMessage('This device cannot open the phone app.', 'Call unavailable'); return; }
+      await Linking.openURL(url);
     } catch {
-      // The visible phone number remains available if this device cannot open the dialer.
+      showErrorMessage('Unable to open the phone app. Please try again on a supported device.', 'Call unavailable');
     }
+  };
+
+  const messageCustomer = async () => {
+    if (!job) return;
+    const phone = job.customerPhone.replace(/[^\d+]/g, '');
+    if (!phone) { showErrorMessage('This customer does not have a usable phone number.', 'Message unavailable'); return; }
+    try {
+      const url = `sms:${phone}`;
+      if (!(await Linking.canOpenURL(url))) { showErrorMessage('This device cannot open an SMS composer.', 'Message unavailable'); return; }
+      await Linking.openURL(url);
+    } catch { showErrorMessage('Unable to open an SMS composer. Please try again on a supported device.', 'Message unavailable'); }
+  };
+
+  const emailCustomer = async () => {
+    if (!job?.customerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(job.customerEmail.trim())) {
+      showErrorMessage('This customer does not have a usable email address.', 'Email unavailable');
+      return;
+    }
+    try {
+      const url = `mailto:${encodeURIComponent(job.customerEmail.trim())}`;
+      if (!(await Linking.canOpenURL(url))) { showErrorMessage('This device cannot open an email app.', 'Email unavailable'); return; }
+      await Linking.openURL(url);
+    } catch { showErrorMessage('Unable to open an email app. Please try again on a supported device.', 'Email unavailable'); }
   };
 
   const submitTransition = useCallback(async (targetStatus: DriverJob['executionStatus']) => {
@@ -329,8 +353,21 @@ export default function DriverActiveJobScreen() {
           <InfoItem icon="scale-outline" label="Estimated weight" value={formatDriverWeight(job.estimatedWeight)} colors={colors} />
           <InfoItem icon="car-outline" label="Assigned vehicle" value={formatDriverVehicle(job.assignment.vehicle)} colors={colors} />
         </View>
-        {job.customerPhone.replace(/[^\d+]/g, '') ? <Button title="Call Customer" variant="outline" onPress={() => void callCustomer()} style={styles.secondaryButton} /> : null}
         {job.deliveredToYardAt ? <InfoItem icon="checkmark-done-outline" label="Delivered to yard" value={`${formatDriverSchedule(job.deliveredToYardAt).date} at ${formatDriverSchedule(job.deliveredToYardAt).time}`} colors={colors} /> : null}
+      </OperationalSection>
+
+      <OperationalSection title="Customer contact" subtitle="Contact the customer about this pickup" icon="person-outline" colors={colors}>
+        <View style={styles.infoGrid}>
+          <InfoItem icon="business-outline" label="Customer / business" value={job.customerName} colors={colors} />
+          {job.contactPerson ? <InfoItem icon="person-outline" label="Contact person" value={job.contactPerson} colors={colors} /> : null}
+          <InfoItem icon="call-outline" label="Phone" value={job.customerPhone || 'Not available'} colors={colors} />
+          {job.customerEmail ? <InfoItem icon="mail-outline" label="Email" value={job.customerEmail} colors={colors} /> : null}
+        </View>
+        <View style={styles.communicationActions}>
+          <CommunicationAction icon="call-outline" label="Call" onPress={() => void callCustomer()} disabled={!job.customerPhone.replace(/[^\d+]/g, '')} colors={colors} />
+          <CommunicationAction icon="chatbubble-outline" label="Message" onPress={() => void messageCustomer()} disabled={!job.customerPhone.replace(/[^\d+]/g, '')} colors={colors} />
+          {job.customerEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(job.customerEmail.trim()) ? <CommunicationAction icon="mail-outline" label="Email" onPress={() => void emailCustomer()} colors={colors} /> : null}
+        </View>
       </OperationalSection>
 
       {job.pickupNotes ? (
@@ -385,6 +422,7 @@ export default function DriverActiveJobScreen() {
 function nextStepDescription(status: DriverJob['executionStatus']): string { if (status === 'assigned') return 'Review the pickup and begin driving when ready.'; if (status === 'en_route') return 'Mark your arrival once you are safely at the pickup.'; if (status === 'arrived') return 'Add evidence and record the collected material.'; return 'Complete delivery after reaching the yard.'; }
 function OperationalSection({ title, subtitle, icon, colors, children }: { title: string; subtitle: string; icon: React.ComponentProps<typeof Ionicons>['name']; colors: (typeof semanticColors)[keyof typeof semanticColors]; children: React.ReactNode }) { return <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={styles.sectionHeading}><Ionicons name={icon} size={20} color={colors.accent} /><View style={styles.sectionHeadingCopy}><Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>{subtitle}</Text></View></View>{children}</View>; }
 function InfoItem({ icon, label, value, colors }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; value: string; colors: (typeof semanticColors)[keyof typeof semanticColors] }) { return <View style={styles.infoItem}><Ionicons name={icon} size={17} color={colors.accent} /><View style={styles.infoCopy}><Text style={[styles.infoLabel, { color: colors.textMuted }]}>{label}</Text><Text style={[styles.infoValue, { color: colors.text }]}>{value}</Text></View></View>; }
+function CommunicationAction({ icon, label, onPress, disabled = false, colors }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; onPress: () => void; disabled?: boolean; colors: (typeof semanticColors)[keyof typeof semanticColors] }) { return <Pressable accessibilityRole="button" accessibilityLabel={`${label} customer`} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.communicationAction, { borderColor: colors.border, backgroundColor: colors.background, opacity: disabled ? 0.45 : pressed ? 0.72 : 1 }]}><Ionicons name={icon} size={21} color={colors.accent} /><Text style={[styles.communicationLabel, { color: colors.text }]}>{label}</Text></Pressable>; }
 function StageHeading({ title, subtitle, colors }: { title: string; subtitle: string; colors: (typeof semanticColors)[keyof typeof semanticColors] }) { return <View style={styles.stageHeading}><Text style={[styles.stageTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.stageSubtitle, { color: colors.textMuted }]}>{subtitle}</Text></View>; }
 const styles = StyleSheet.create({
   content: { gap: spacing.md, paddingTop: spacing.md },
@@ -409,6 +447,9 @@ const styles = StyleSheet.create({
   infoLabel: { fontFamily: typography.fontFamily.bodyMedium, fontSize: 11 },
   infoValue: { fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm },
   secondaryButton: { minHeight: 46, borderRadius: radius.lg },
+  communicationActions: { flexDirection: 'row', gap: spacing.sm },
+  communicationAction: { flex: 1, minHeight: 58, alignItems: 'center', justifyContent: 'center', gap: 3, borderWidth: 1, borderRadius: radius.lg },
+  communicationLabel: { fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.sm },
   instructionsCard: { borderLeftWidth: 4, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
   instructionsHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   instructionsTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.md },

@@ -7,6 +7,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...config,
     name: config.name ?? 'ProCopper Recycling',
     slug: config.slug ?? 'mobile',
+    android: {
+      ...(config.android ?? {}),
+      googleServicesFile: './google-services.json',
+    },
     plugins: [
       ...(config.plugins ?? []),
       [
@@ -26,6 +30,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       [
         'react-native-maps',
         androidGoogleMapsApiKey ? { androidGoogleMapsApiKey } : {},
+      ],
+      [
+        'expo-notifications',
+        {
+          defaultChannel: 'driver-jobs',
+        },
       ],
     ],
   };

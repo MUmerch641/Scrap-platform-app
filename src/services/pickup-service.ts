@@ -2,14 +2,32 @@ import { supabase, supabaseConfigurationError } from '@/services/supabase-client
 
 export const MATERIAL_OPTIONS = [
   'Copper',
+  'Insulated copper wire/cable',
+  'Aluminium',
+  'Steel',
+  'Stainless steel',
   'Brass',
-  'Aluminum',
-  'Heavy Iron',
-  'Mixed Scrap',
+  'Mixed metal',
+  'Machinery',
+  'Old equipment',
+  'Metal shelving',
+  'Metal offcuts',
+  'Other recyclable metal',
 ] as const;
+
+export const AUSTRALIAN_STATE_OPTIONS = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'] as const;
 
 export const PICKUP_FIELD_LIMITS = {
   address: 300,
+  suburb: 120,
+  state: 64,
+  postcode: 20,
+  materialDescription: 1000,
+  siteAccessInstructions: 1000,
+  loadingRequirements: 1000,
+  deliveryYardName: 200,
+  leadSource: 120,
+  internalNotes: 1000,
   notes: 1000,
   estimatedWeightKg: 1_000_000,
 } as const;
@@ -30,10 +48,19 @@ export interface PickupRequest {
   customerName?: string;
   customerPhone?: string;
   pickupAddress: string;
+  pickupSuburb: string | null;
+  pickupState: string | null;
+  pickupPostcode: string | null;
   requestedDate: string;
   requestedTime: string | null;
   materialType: string;
+  materialDescription: string | null;
   estimatedWeight: number | null;
+  siteAccessInstructions: string | null;
+  loadingRequirements: string | null;
+  deliveryYardName: string | null;
+  leadSource: string | null;
+  internalNotes: string | null;
   notes: string | null;
   status: PickupRequestStatus;
   createdAt: string;
@@ -43,20 +70,38 @@ export interface PickupRequest {
 export interface CreatePickupRequestInput {
   customerId: string;
   pickupAddress: string;
+  pickupSuburb: string;
+  pickupState: string;
+  pickupPostcode: string;
   requestedDate: string;
   requestedTime?: string | null;
   materialType: string;
+  materialDescription?: string | null;
   estimatedWeight?: number | null;
+  siteAccessInstructions?: string | null;
+  loadingRequirements?: string | null;
+  deliveryYardName?: string | null;
+  leadSource?: string | null;
+  internalNotes?: string | null;
   notes?: string | null;
 }
 
 interface NormalizedPickupRequestInput {
   customerId: string;
   pickupAddress: string;
+  pickupSuburb: string;
+  pickupState: string;
+  pickupPostcode: string;
   requestedDate: string;
   requestedTime: string | null;
   materialType: string;
+  materialDescription: string | null;
   estimatedWeight: number | null;
+  siteAccessInstructions: string | null;
+  loadingRequirements: string | null;
+  deliveryYardName: string | null;
+  leadSource: string | null;
+  internalNotes: string | null;
   notes: string | null;
 }
 
@@ -117,10 +162,19 @@ interface RawPickupRequestRow {
   created_by: string;
   customer_id: string;
   pickup_address: string;
+  pickup_suburb: string | null;
+  pickup_state: string | null;
+  pickup_postcode: string | null;
   requested_date: string;
   requested_time: string | null;
   material_type: string;
+  material_description: string | null;
   estimated_weight: number | null;
+  site_access_instructions: string | null;
+  loading_requirements: string | null;
+  delivery_yard_name: string | null;
+  lead_source: string | null;
+  internal_notes: string | null;
   notes: string | null;
   status: PickupRequestStatus;
   created_at: string;
@@ -138,10 +192,19 @@ interface RawPickupDirectoryRow {
   customer_name: string;
   customer_phone: string;
   pickup_address: string;
+  pickup_suburb: string | null;
+  pickup_state: string | null;
+  pickup_postcode: string | null;
   requested_date: string;
   requested_time: string | null;
   material_type: string;
+  material_description: string | null;
   estimated_weight: number | null;
+  site_access_instructions: string | null;
+  loading_requirements: string | null;
+  delivery_yard_name: string | null;
+  lead_source: string | null;
+  internal_notes: string | null;
   notes: string | null;
   status: PickupRequestStatus;
   created_at: string;
@@ -156,9 +219,9 @@ const DEFAULT_METRICS: PickupMetrics = {
 };
 
 const PICKUP_COLUMNS =
-  'id, created_by, customer_id, pickup_address, requested_date, requested_time, material_type, estimated_weight, notes, status, created_at, updated_at, customers(name, phone)';
+  'id, created_by, customer_id, pickup_address, pickup_suburb, pickup_state, pickup_postcode, requested_date, requested_time, material_type, material_description, estimated_weight, notes, site_access_instructions, loading_requirements, delivery_yard_name, lead_source, internal_notes, status, created_at, updated_at, customers(name, phone)';
 const PICKUP_DIRECTORY_COLUMNS =
-  'id, created_by, customer_id, customer_name, customer_phone, pickup_address, requested_date, requested_time, material_type, estimated_weight, notes, status, created_at, updated_at';
+  'id, created_by, customer_id, customer_name, customer_phone, pickup_address, pickup_suburb, pickup_state, pickup_postcode, requested_date, requested_time, material_type, material_description, estimated_weight, notes, site_access_instructions, loading_requirements, delivery_yard_name, lead_source, internal_notes, status, created_at, updated_at';
 const MAX_PICKUP_PAGE_SIZE = 100;
 const MAX_PICKUP_SEARCH_LENGTH = 100;
 const LOCAL_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -198,10 +261,19 @@ function mapRowToPickupRequest(row: RawPickupRequestRow): PickupRequest {
     customerName: customer?.name,
     customerPhone: customer?.phone,
     pickupAddress: row.pickup_address,
+    pickupSuburb: row.pickup_suburb,
+    pickupState: row.pickup_state,
+    pickupPostcode: row.pickup_postcode,
     requestedDate: row.requested_date,
     requestedTime: row.requested_time,
     materialType: row.material_type,
+    materialDescription: row.material_description,
     estimatedWeight: row.estimated_weight != null ? Number(row.estimated_weight) : null,
+    siteAccessInstructions: row.site_access_instructions,
+    loadingRequirements: row.loading_requirements,
+    deliveryYardName: row.delivery_yard_name,
+    leadSource: row.lead_source,
+    internalNotes: row.internal_notes,
     notes: row.notes,
     status: row.status,
     createdAt: row.created_at,
@@ -217,10 +289,19 @@ function mapDirectoryRowToPickupRequest(row: RawPickupDirectoryRow): PickupReque
     customerName: row.customer_name,
     customerPhone: row.customer_phone,
     pickupAddress: row.pickup_address,
+    pickupSuburb: row.pickup_suburb,
+    pickupState: row.pickup_state,
+    pickupPostcode: row.pickup_postcode,
     requestedDate: row.requested_date,
     requestedTime: row.requested_time,
     materialType: row.material_type,
+    materialDescription: row.material_description,
     estimatedWeight: row.estimated_weight != null ? Number(row.estimated_weight) : null,
+    siteAccessInstructions: row.site_access_instructions,
+    loadingRequirements: row.loading_requirements,
+    deliveryYardName: row.delivery_yard_name,
+    leadSource: row.lead_source,
+    internalNotes: row.internal_notes,
     notes: row.notes,
     status: row.status,
     createdAt: row.created_at,
@@ -292,10 +373,19 @@ export function validatePickupRequestInput(
 ): PickupValidationResult {
   const customerId = input.customerId.trim();
   const pickupAddress = input.pickupAddress.trim();
+  const pickupSuburb = input.pickupSuburb.trim().replace(/\s+/g, ' ');
+  const pickupState = input.pickupState.trim().toUpperCase();
+  const pickupPostcode = input.pickupPostcode.trim().replace(/\s+/g, ' ');
   const requestedDate = input.requestedDate.trim();
   const requestedTime = input.requestedTime?.trim() || null;
   const materialType = input.materialType.trim();
+  const materialDescription = input.materialDescription?.trim() || null;
   const estimatedWeight = input.estimatedWeight ?? null;
+  const siteAccessInstructions = input.siteAccessInstructions?.trim() || null;
+  const loadingRequirements = input.loadingRequirements?.trim() || null;
+  const deliveryYardName = input.deliveryYardName?.trim() || null;
+  const leadSource = input.leadSource?.trim() || null;
+  const internalNotes = input.internalNotes?.trim() || null;
   const notes = input.notes?.trim() || null;
 
   if (!customerId) return { success: false, error: 'Customer selection is required.' };
@@ -305,6 +395,18 @@ export function validatePickupRequestInput(
       success: false,
       error: `Pickup address must be ${PICKUP_FIELD_LIMITS.address} characters or fewer.`,
     };
+  }
+  if (!pickupSuburb) return { success: false, error: 'Pickup suburb is required.' };
+  if (pickupSuburb.length > PICKUP_FIELD_LIMITS.suburb) {
+    return { success: false, error: `Pickup suburb must be ${PICKUP_FIELD_LIMITS.suburb} characters or fewer.` };
+  }
+  if (!pickupState) return { success: false, error: 'Pickup state is required.' };
+  if (!AUSTRALIAN_STATE_OPTIONS.includes(pickupState as (typeof AUSTRALIAN_STATE_OPTIONS)[number])) {
+    return { success: false, error: 'Select a valid Australian state or territory.' };
+  }
+  if (!pickupPostcode) return { success: false, error: 'Pickup postcode is required.' };
+  if (!/^\d{4}$/.test(pickupPostcode)) {
+    return { success: false, error: 'Pickup postcode must contain 4 digits.' };
   }
 
   if (!requestedDate) return { success: false, error: 'Requested date is required.' };
@@ -323,6 +425,18 @@ export function validatePickupRequestInput(
   if (!MATERIAL_OPTIONS.includes(materialType as (typeof MATERIAL_OPTIONS)[number])) {
     return { success: false, error: 'Select a material type from the available options.' };
   }
+  const optionalFieldChecks: [string | null, number, string][] = [
+    [materialDescription, PICKUP_FIELD_LIMITS.materialDescription, 'Material description'],
+    [siteAccessInstructions, PICKUP_FIELD_LIMITS.siteAccessInstructions, 'Site access instructions'],
+    [loadingRequirements, PICKUP_FIELD_LIMITS.loadingRequirements, 'Loading requirements'],
+    [deliveryYardName, PICKUP_FIELD_LIMITS.deliveryYardName, 'Delivery yard'],
+    [leadSource, PICKUP_FIELD_LIMITS.leadSource, 'Lead source'],
+    [internalNotes, PICKUP_FIELD_LIMITS.internalNotes, 'Internal notes'],
+    [notes, PICKUP_FIELD_LIMITS.notes, 'Special instructions'],
+  ];
+  for (const [value, limit, label] of optionalFieldChecks) {
+    if (value && value.length > limit) return { success: false, error: `${label} must be ${limit} characters or fewer.` };
+  }
 
   if (estimatedWeight !== null) {
     if (!Number.isFinite(estimatedWeight)) {
@@ -339,22 +453,24 @@ export function validatePickupRequestInput(
     }
   }
 
-  if (notes && notes.length > PICKUP_FIELD_LIMITS.notes) {
-    return {
-      success: false,
-      error: `Pickup notes must be ${PICKUP_FIELD_LIMITS.notes} characters or fewer.`,
-    };
-  }
-
   return {
     success: true,
     value: {
       customerId,
       pickupAddress,
+      pickupSuburb,
+      pickupState,
+      pickupPostcode,
       requestedDate,
       requestedTime,
       materialType,
+      materialDescription,
       estimatedWeight,
+      siteAccessInstructions,
+      loadingRequirements,
+      deliveryYardName,
+      leadSource,
+      internalNotes,
       notes,
     },
   };
@@ -603,10 +719,19 @@ export async function createPickupRequest(
         client_request_id: clientRequestId,
         customer_id: value.customerId,
         pickup_address: value.pickupAddress,
+        pickup_suburb: value.pickupSuburb,
+        pickup_state: value.pickupState,
+        pickup_postcode: value.pickupPostcode,
         requested_date: value.requestedDate,
         requested_time: value.requestedTime,
         material_type: value.materialType,
+        material_description: value.materialDescription,
         estimated_weight: value.estimatedWeight,
+        site_access_instructions: value.siteAccessInstructions,
+        loading_requirements: value.loadingRequirements,
+        delivery_yard_name: value.deliveryYardName,
+        lead_source: value.leadSource,
+        internal_notes: value.internalNotes,
         notes: value.notes,
         status: 'pending_review',
       })

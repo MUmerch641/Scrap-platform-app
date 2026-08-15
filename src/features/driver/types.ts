@@ -48,12 +48,23 @@ export interface DriverCoordinate {
   longitude: number;
 }
 
+export interface AvailableDriverJob {
+  id: string;
+  scheduledAt: string;
+  pickupArea: string | null;
+  materialType: string;
+  estimatedWeight: number | null;
+  availableAt: string;
+}
+
 export interface DriverJob {
   id: string;
   executionStatus: DriverExecutionStatus;
   scheduledAt: string | null;
   customerName: string;
+  contactPerson: string | null;
   customerPhone: string;
+  customerEmail: string | null;
   pickupAddress: string;
   pickupCoordinate: DriverCoordinate | null;
   materialType: string;

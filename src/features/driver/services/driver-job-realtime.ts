@@ -28,9 +28,10 @@ export function subscribeToDriverJobRealtime(): DriverJobRealtimeSubscription {
   };
 
   const channel = supabase
-    .channel('driver-job-refresh-v1')
+    .channel('driver-job-refresh-v2')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'pickup_jobs' }, scheduleRefresh)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'pickup_job_assignments' }, scheduleRefresh)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'driver_job_availability_events' }, scheduleRefresh)
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         if (connectedOnce) scheduleRefresh();
