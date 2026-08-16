@@ -5,7 +5,7 @@ const STATUS_LABELS: Record<DriverExecutionStatus, string> = {
   en_route: 'En Route',
   arrived: 'Arrived',
   material_collected: 'Material Collected',
-  delivered_to_yard: 'Delivered to Yard',
+  delivered_to_yard: 'Awaiting Yard Weight Confirmation',
 };
 
 export function formatDriverStatus(status: DriverExecutionStatus): string {

@@ -104,6 +104,8 @@ interface RawDriverJob {
   vehicle_label: string;
   vehicle_registration_number: string | null;
   actual_collected_weight: number | string | null;
+  final_yard_weight?: number | string | null;
+  yard_confirmed_weight?: number | string | null;
   driver_notes: string | null;
   en_route_at: string | null;
   arrived_at: string | null;
@@ -139,7 +141,14 @@ function getDeviceTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 }
 
+function mapOptionalWeight(value: number | string | null | undefined): number | null {
+  if (value == null) return null;
+  const weight = Number(value);
+  return Number.isFinite(weight) && weight >= 0 ? weight : null;
+}
+
 function mapJob(row: RawDriverJob): DriverJob {
+  const finalYardWeight = row.final_yard_weight ?? row.yard_confirmed_weight ?? null;
   const vehicle: VehicleSummary = {
     id: row.vehicle_id,
     label: row.vehicle_label,
@@ -167,6 +176,7 @@ function mapJob(row: RawDriverJob): DriverJob {
     },
     actualCollectedWeight:
       row.actual_collected_weight == null ? null : Number(row.actual_collected_weight),
+    finalYardWeight: mapOptionalWeight(finalYardWeight),
     driverNotes: row.driver_notes,
     enRouteAt: row.en_route_at,
     arrivedAt: row.arrived_at,

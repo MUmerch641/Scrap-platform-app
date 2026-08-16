@@ -60,7 +60,7 @@ import {
     showInfoMessage,
     showNativeConfirmation,
 } from '@/services/native-feedback-service';
-import { brandColors, radius, semanticColors, spacing, typography } from '@/shared/theme';
+import { brandColors, radius, semanticColors, spacing, statusColors, typography } from '@/shared/theme';
 
 // ── Pagination config ─────────────────────────────────────────────────────────
 const PAGE_SIZE = 30;
@@ -80,8 +80,24 @@ function useColors() {
   return semanticColors[isDark ? 'dark' : 'light'];
 }
 
+function customerStatusTone(status: CustomerStatus, isDark: boolean) {
+  const palette = statusColors[isDark ? 'dark' : 'light'];
+  if (status === 'active_customer') return palette.success;
+  if (status === 'inactive' || status === 'not_interested' || status === 'do_not_contact') return palette.danger;
+  if (status === 'contacted') {
+    return isDark
+      ? { surface: 'rgba(121, 192, 229, 0.16)', text: '#BCE8FF', border: 'rgba(121, 192, 229, 0.42)' }
+      : { surface: '#EDF7FC', text: '#075985', border: '#BAE6FD' };
+  }
+  return isDark
+    ? { surface: 'rgba(230, 164, 107, 0.18)', text: '#F4C08F', border: 'rgba(230, 164, 107, 0.48)' }
+    : { surface: '#FFF4E8', text: '#9A541D', border: '#F1C18C' };
+}
+
 const CustomerRow = React.memo(function CustomerRow({ customer, onOpen, onCreatePickup }: CustomerRowProps) {
   const colors = useColors();
+  const isDark = useColorScheme() === 'dark';
+  const statusTone = customerStatusTone(customer.customerStatus, isDark);
   return (
     <Pressable
       onPress={() => onOpen(customer)}
@@ -102,16 +118,20 @@ const CustomerRow = React.memo(function CustomerRow({ customer, onOpen, onCreate
           >
             {customer.name}
           </Text>
-          <View style={styles.cardHeaderMeta}>
-            <Text
-              style={[styles.customerPhone, { color: colors.primary }]}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {customer.phone}
-            </Text>
-            <Text style={[styles.statusText, { color: colors.primary }]}>{formatCustomerStatus(customer.customerStatus)}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: statusTone.surface, borderColor: statusTone.border }]}>
+            <Text style={[styles.statusText, { color: statusTone.text }]} numberOfLines={1}>{formatCustomerStatus(customer.customerStatus)}</Text>
           </View>
+        </View>
+
+        <View style={styles.iconRow}>
+          <AppIcon name="call-outline" size={12} />
+          <Text
+            style={[styles.customerPhone, { color: colors.primary }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {customer.phone}
+          </Text>
         </View>
 
         <View style={styles.iconRow}>
@@ -1107,13 +1127,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.xs,
   },
-  cardHeaderMeta: {
-    flexShrink: 1,
-    maxWidth: '48%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
+  statusBadge: { flexShrink: 1, maxWidth: '46%', minHeight: 24, justifyContent: 'center', borderWidth: 1, borderRadius: radius.full, paddingHorizontal: spacing.sm },
   customerName: {
     flex: 1,
     flexShrink: 1,
@@ -1205,8 +1219,11 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   statusText: {
-    fontFamily: typography.fontFamily.bodyMedium,
-    fontSize: typography.fontSize.xs,
+    fontFamily: typography.fontFamily.bodySemibold,
+    fontSize: 11,
+    lineHeight: 15,
+    textTransform: 'uppercase',
+    letterSpacing: 0.2,
   },
   createPickupAction: {
     alignSelf: 'flex-start',

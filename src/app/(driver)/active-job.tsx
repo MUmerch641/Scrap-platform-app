@@ -65,7 +65,7 @@ const NEXT_ACTIONS: Partial<Record<DriverJob['executionStatus'], {
     title: 'Delivered to Yard',
     targetStatus: 'delivered_to_yard',
     confirmationTitle: 'Confirm delivery to yard?',
-    confirmationMessage: () => 'Confirm the material has been delivered to the yard. This completes Driver execution for this job.',
+    confirmationMessage: () => 'Confirm the material has been delivered to the yard. Your delivery will become read-only while Operations or Yard confirms the final weight.',
   },
 };
 
@@ -217,7 +217,6 @@ export default function DriverActiveJobScreen() {
     if (!phone) { showErrorMessage('This customer does not have a usable phone number.', 'Call unavailable'); return; }
     try {
       const url = `tel:${phone}`;
-      if (!(await Linking.canOpenURL(url))) { showErrorMessage('This device cannot open the phone app.', 'Call unavailable'); return; }
       await Linking.openURL(url);
     } catch {
       showErrorMessage('Unable to open the phone app. Please try again on a supported device.', 'Call unavailable');
@@ -230,7 +229,6 @@ export default function DriverActiveJobScreen() {
     if (!phone) { showErrorMessage('This customer does not have a usable phone number.', 'Message unavailable'); return; }
     try {
       const url = `sms:${phone}`;
-      if (!(await Linking.canOpenURL(url))) { showErrorMessage('This device cannot open an SMS composer.', 'Message unavailable'); return; }
       await Linking.openURL(url);
     } catch { showErrorMessage('Unable to open an SMS composer. Please try again on a supported device.', 'Message unavailable'); }
   };
@@ -241,8 +239,7 @@ export default function DriverActiveJobScreen() {
       return;
     }
     try {
-      const url = `mailto:${encodeURIComponent(job.customerEmail.trim())}`;
-      if (!(await Linking.canOpenURL(url))) { showErrorMessage('This device cannot open an email app.', 'Email unavailable'); return; }
+      const url = `mailto:${job.customerEmail.trim()}`;
       await Linking.openURL(url);
     } catch { showErrorMessage('Unable to open an email app. Please try again on a supported device.', 'Email unavailable'); }
   };
@@ -412,8 +409,8 @@ export default function DriverActiveJobScreen() {
       {['arrived', 'material_collected', 'delivered_to_yard'].includes(job.executionStatus) ? (
         <View style={styles.stageBlock}>
           <StageHeading title="Photo evidence" subtitle="Capture a clear record of the pickup" colors={colors} />
-          <DriverJobPhotoSection title="Collection Photos" photoType="collection" photos={photos} pending={pendingPhotos} canAdd={job.executionStatus !== 'delivered_to_yard'} onTakePhoto={() => void selectPhoto('collection', 'camera')} onChoosePhoto={() => void selectPhoto('collection', 'library')} onRetry={(photo) => void uploadSelectedPhoto(photo)} onRemove={removePendingPhoto} onPreview={(uri, label) => setPhotoPreview({ uri, label })} />
-          {['material_collected', 'delivered_to_yard'].includes(job.executionStatus) ? <DriverJobPhotoSection title="Delivery Photos" photoType="delivery" photos={photos} pending={pendingPhotos} canAdd={job.executionStatus === 'material_collected'} onTakePhoto={() => void selectPhoto('delivery', 'camera')} onChoosePhoto={() => void selectPhoto('delivery', 'library')} onRetry={(photo) => void uploadSelectedPhoto(photo)} onRemove={removePendingPhoto} onPreview={(uri, label) => setPhotoPreview({ uri, label })} /> : null}
+          <DriverJobPhotoSection title="Collection Photos" photoType="collection" photos={photos} pending={pendingPhotos} canAdd={job.executionStatus !== 'delivered_to_yard'} readOnly={job.executionStatus === 'delivered_to_yard'} onTakePhoto={() => void selectPhoto('collection', 'camera')} onChoosePhoto={() => void selectPhoto('collection', 'library')} onRetry={(photo) => void uploadSelectedPhoto(photo)} onRemove={removePendingPhoto} onPreview={(uri, label) => setPhotoPreview({ uri, label })} />
+          {['material_collected', 'delivered_to_yard'].includes(job.executionStatus) ? <DriverJobPhotoSection title="Delivery Photos" photoType="delivery" photos={photos} pending={pendingPhotos} canAdd={job.executionStatus === 'material_collected'} readOnly={job.executionStatus === 'delivered_to_yard'} onTakePhoto={() => void selectPhoto('delivery', 'camera')} onChoosePhoto={() => void selectPhoto('delivery', 'library')} onRetry={(photo) => void uploadSelectedPhoto(photo)} onRemove={removePendingPhoto} onPreview={(uri, label) => setPhotoPreview({ uri, label })} /> : null}
         </View>
       ) : null}
 
@@ -429,10 +426,22 @@ export default function DriverActiveJobScreen() {
       ) : null}
 
       {job.executionStatus === 'material_collected' || job.executionStatus === 'delivered_to_yard' ? (
-        <OperationalSection title="Collected material" subtitle="Recorded at pickup" icon="checkmark-circle-outline" colors={colors}>
-          <InfoItem icon="scale-outline" label="Actual collected weight" value={formatDriverWeight(job.actualCollectedWeight)} colors={colors} />
+        <OperationalSection title="Collected material" subtitle="Recorded by Driver at pickup" icon="checkmark-circle-outline" colors={colors}>
+          <InfoItem icon="scale-outline" label="Driver collected weight" value={formatDriverWeight(job.actualCollectedWeight)} colors={colors} />
           <InfoItem icon="document-text-outline" label="Driver notes" value={job.driverNotes ?? 'No driver notes'} colors={colors} />
         </OperationalSection>
+      ) : null}
+
+      {job.executionStatus === 'delivered_to_yard' ? (
+        <View style={[styles.yardConfirmationState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.yardConfirmationIcon, { backgroundColor: colors.background }]}><Ionicons name="scale-outline" size={26} color={colors.accent} /></View>
+          <View style={styles.yardConfirmationCopy}>
+            <Text style={[styles.yardConfirmationTitle, { color: colors.text }]}>Awaiting Yard Weight Confirmation</Text>
+            <Text style={[styles.yardConfirmationMessage, { color: colors.textMuted }]}>Your delivery is recorded. Operations or Yard will confirm the final yard weight. This job is read-only for you.</Text>
+            <Text style={[styles.yardWeightLine, { color: colors.text }]}>Driver collected weight: {formatDriverWeight(job.actualCollectedWeight)}</Text>
+            {job.finalYardWeight != null ? <Text style={[styles.yardWeightLine, { color: colors.success }]}>Final yard weight: {formatDriverWeight(job.finalYardWeight)}</Text> : null}
+          </View>
+        </View>
       ) : null}
 
       {nextAction ? (
@@ -443,7 +452,7 @@ export default function DriverActiveJobScreen() {
           {transitionError ? <Text style={[styles.actionError, { color: colors.danger }]}>{transitionError}</Text> : null}
         </View>
       ) : (
-        <View style={[styles.completedState, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={[styles.completedIcon, { backgroundColor: colors.background }]}><Ionicons name="checkmark-done" size={26} color={colors.success} /></View><View style={styles.completedCopy}><Text style={[styles.completedTitle, { color: colors.text }]}>Job complete</Text><Text style={[styles.completedMessage, { color: colors.textMuted }]}>Material was delivered to the yard. No further Driver action is required.</Text></View></View>
+        <View style={[styles.completedState, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={[styles.completedIcon, { backgroundColor: colors.background }]}><Ionicons name="hourglass-outline" size={26} color={colors.accent} /></View><View style={styles.completedCopy}><Text style={[styles.completedTitle, { color: colors.text }]}>Delivery submitted</Text><Text style={[styles.completedMessage, { color: colors.textMuted }]}>Awaiting Operations or Yard confirmation of the final weight. No further Driver action is required.</Text></View></View>
       )}
 
       <Modal visible={Boolean(photoPreview)} transparent animationType="fade" onRequestClose={() => setPhotoPreview(null)}><Pressable style={styles.previewBackdrop} onPress={() => setPhotoPreview(null)}><Pressable style={[styles.previewCard, { backgroundColor: colors.surface }]} onPress={() => undefined}><View style={styles.previewHeading}><Text style={[styles.previewTitle, { color: colors.text }]}>{photoPreview?.label}</Text><Pressable onPress={() => setPhotoPreview(null)} accessibilityRole="button" accessibilityLabel="Close photo preview" style={[styles.previewClose, { backgroundColor: colors.background }]}><Ionicons name="close" size={22} color={colors.text} /></Pressable></View>{photoPreview ? <Image source={{ uri: photoPreview.uri }} style={styles.previewImage} contentFit="contain" /> : null}</Pressable></Pressable></Modal>
@@ -504,6 +513,12 @@ const styles = StyleSheet.create({
   completedCopy: { flex: 1, gap: spacing.xs },
   completedTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg },
   completedMessage: { fontFamily: typography.fontFamily.body, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm },
+  yardConfirmationState: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg },
+  yardConfirmationIcon: { width: 50, height: 50, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
+  yardConfirmationCopy: { flex: 1, gap: spacing.xs },
+  yardConfirmationTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg },
+  yardConfirmationMessage: { fontFamily: typography.fontFamily.body, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm },
+  yardWeightLine: { fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.sm, marginTop: 2 },
   previewBackdrop: { flex: 1, justifyContent: 'center', padding: spacing.md, backgroundColor: 'rgba(0, 0, 0, 0.76)' },
   previewCard: { maxHeight: '92%', borderRadius: radius.xl, padding: spacing.md, gap: spacing.md },
   previewHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },

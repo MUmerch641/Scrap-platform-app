@@ -78,7 +78,6 @@ export default function CustomerDetailScreen() {
 
   const openNative = async (url: string, unavailable: string) => {
     try {
-      if (!(await Linking.canOpenURL(url))) throw new Error('unsupported');
       await Linking.openURL(url);
     } catch {
       showErrorMessage(unavailable, 'Unavailable');
@@ -137,7 +136,7 @@ export default function CustomerDetailScreen() {
           <View style={styles.actions}>
             <Button title="Call" variant="secondary" onPress={() => void openNative(`tel:${phone}`, 'This device cannot place calls.')} style={styles.actionButton} />
             <Button title="Message" variant="secondary" onPress={() => void openNative(`sms:${phone}`, 'This device cannot send messages.')} style={styles.actionButton} />
-            {customer.email ? <Button title="Email" variant="secondary" onPress={() => void openNative(`mailto:${customer.email}`, 'This device cannot send email.')} style={styles.actionButton} /> : null}
+            {customer.email ? <Button title="Email" variant="secondary" onPress={() => void openNative(`mailto:${customer.email?.trim() ?? ''}`, 'This device cannot send email.')} style={styles.actionButton} /> : null}
           </View>
         </Section>
 

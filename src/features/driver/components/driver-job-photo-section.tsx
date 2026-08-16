@@ -13,6 +13,7 @@ interface Props {
   photos: DriverJobPhoto[];
   pending: PendingDriverJobPhoto[];
   canAdd: boolean;
+  readOnly?: boolean;
   onTakePhoto: () => void;
   onChoosePhoto: () => void;
   onRetry: (photo: PendingDriverJobPhoto) => void;
@@ -20,7 +21,7 @@ interface Props {
   onPreview: (uri: string, label: string) => void;
 }
 
-export function DriverJobPhotoSection({ title, photoType, photos, pending, canAdd, onTakePhoto, onChoosePhoto, onRetry, onRemove, onPreview }: Props) {
+export function DriverJobPhotoSection({ title, photoType, photos, pending, canAdd, readOnly = false, onTakePhoto, onChoosePhoto, onRetry, onRemove, onPreview }: Props) {
   const colors = semanticColors[useColorScheme() === 'dark' ? 'dark' : 'light'];
   const categoryPhotos = photos.filter((photo) => photo.photoType === photoType);
   const categoryPending = pending.filter((photo) => photo.photoType === photoType);
@@ -74,8 +75,8 @@ export function DriverJobPhotoSection({ title, photoType, photos, pending, canAd
               status={photo.status}
               error={photo.error}
               onPress={() => onPreview(photo.uri, `${title.slice(0, -1)} ${index + 1}`)}
-              onRetry={photo.status === 'failed' ? () => onRetry(photo) : undefined}
-              onRemove={photo.status !== 'uploading' ? () => onRemove(photo) : undefined}
+              onRetry={!readOnly && photo.status === 'failed' ? () => onRetry(photo) : undefined}
+              onRemove={!readOnly && photo.status !== 'uploading' ? () => onRemove(photo) : undefined}
               colors={colors}
             />
           ))}

@@ -20,16 +20,16 @@ import { brandColors, radius, semanticColors, spacing, typography } from '@/shar
 
 type JobsView = 'available' | 'mine';
 type JobsFilter = 'today' | 'upcoming' | 'completed';
-const FILTERS: { key: JobsFilter; label: string; icon: 'today-outline' | 'calendar-outline' | 'checkmark-done-outline' }[] = [
+const FILTERS: { key: JobsFilter; label: string; icon: 'today-outline' | 'calendar-outline' | 'business-outline' }[] = [
   { key: 'today', label: 'Today', icon: 'today-outline' },
   { key: 'upcoming', label: 'Upcoming', icon: 'calendar-outline' },
-  { key: 'completed', label: 'Completed', icon: 'checkmark-done-outline' },
+  { key: 'completed', label: 'Delivered', icon: 'business-outline' },
 ];
 const OPEN_STATUSES: DriverExecutionStatus[] = ['assigned', 'en_route', 'arrived', 'material_collected'];
 const ACTIVE_STATUSES: DriverExecutionStatus[] = ['en_route', 'arrived', 'material_collected'];
 
 function tomorrow(): string { const date = new Date(); date.setDate(date.getDate() + 1); return formatDriverLocalDate(date); }
-function emptyCopy(filter: JobsFilter) { return filter === 'today' ? ['No accepted jobs today', 'Jobs you accept for today will appear here.'] : filter === 'upcoming' ? ['No upcoming accepted jobs', 'Future jobs you accept will appear here.'] : ['No completed jobs yet', 'Delivered jobs will appear here as your history grows.']; }
+function emptyCopy(filter: JobsFilter) { return filter === 'today' ? ['No accepted jobs today', 'Jobs you accept for today will appear here.'] : filter === 'upcoming' ? ['No upcoming accepted jobs', 'Future jobs you accept will appear here.'] : ['No delivered jobs yet', 'Delivered jobs awaiting Yard weight confirmation will appear here.']; }
 function optionsFor(filter: JobsFilter, page: number): DriverJobPageOptions { return filter === 'today' ? { page, pageSize: DRIVER_JOB_PAGE_SIZE, scheduledFrom: formatDriverLocalDate(new Date()), scheduledTo: formatDriverLocalDate(new Date()), executionStatuses: OPEN_STATUSES } : filter === 'upcoming' ? { page, pageSize: DRIVER_JOB_PAGE_SIZE, scheduledFrom: tomorrow(), executionStatuses: ['assigned'] } : { page, pageSize: DRIVER_JOB_PAGE_SIZE, executionStatuses: ['delivered_to_yard'], sort: 'delivered_desc' }; }
 
 export default function DriverJobsScreen() {

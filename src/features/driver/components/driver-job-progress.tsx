@@ -10,7 +10,7 @@ const STEPS: { status: DriverExecutionStatus; shortLabel: string }[] = [
   { status: 'en_route', shortLabel: 'En Route' },
   { status: 'arrived', shortLabel: 'Arrived' },
   { status: 'material_collected', shortLabel: 'Collected' },
-  { status: 'delivered_to_yard', shortLabel: 'Delivered' },
+  { status: 'delivered_to_yard', shortLabel: 'Yard Review' },
 ];
 
 export function DriverJobProgress({ status }: { status: DriverExecutionStatus }) {
