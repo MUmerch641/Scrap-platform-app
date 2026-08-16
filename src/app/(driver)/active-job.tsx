@@ -350,15 +350,17 @@ export default function DriverActiveJobScreen() {
   if (!job) return <ScreenScaffold header={header}><EmptyState title={screenState === 'conflict' ? 'Multiple active jobs' : jobId ? 'Job unavailable' : 'No active job'} message={screenState === 'conflict' ? 'Your assignments need Operations review before you continue.' : jobId ? 'This job is no longer available to your account.' : 'Your assigned jobs will appear here once work begins.'} action={<Button title="View Jobs" variant="outline" onPress={() => router.push('/(driver)/jobs')} />} variant="dashboard" /></ScreenScaffold>;
 
   const schedule = formatDriverSchedule(job.scheduledAt);
+  const isDelivered = job.executionStatus === 'delivered_to_yard';
+  const hasYardConfirmation = isDelivered && (Boolean(job.yardConfirmedAt) || job.finalYardWeight != null);
   const nextAction = NEXT_ACTIONS[job.executionStatus];
   const qaPickupCoordinate = job.pickupCoordinate ? null : getQaPickupCoordinate();
   const pickupCoordinate = job.pickupCoordinate ?? qaPickupCoordinate;
   return (
-    <ScreenScaffold mode="form" header={<AppHeader title="Active Job" subtitle={job.customerName} />} contentContainerStyle={styles.content} androidKeyboardAvoidance>
+    <ScreenScaffold mode="form" header={<AppHeader title={isDelivered ? 'Job Details' : 'Active Job'} subtitle={job.customerName} />} contentContainerStyle={styles.content} androidKeyboardAvoidance>
       <View style={styles.overviewHero}>
         <View style={styles.overviewTop}>
           <Text style={styles.customerName} numberOfLines={2}>{job.customerName}</Text>
-          <DriverStatusPill status={job.executionStatus} inverse />
+          <DriverStatusPill status={job.executionStatus} inverse label={hasYardConfirmation ? 'Yard Weight Confirmed' : undefined} />
         </View>
         <View style={styles.heroDetail}><Ionicons name="time-outline" size={17} color={brandColors.lightCopper} /><Text style={styles.heroDetailText}>{schedule.time} · {schedule.date}</Text></View>
         <View style={styles.heroDetail}><Ionicons name="location-outline" size={17} color={brandColors.lightCopper} /><Text style={styles.heroDetailText} numberOfLines={2}>{job.pickupAddress}</Text></View>
@@ -436,8 +438,8 @@ export default function DriverActiveJobScreen() {
         <View style={[styles.yardConfirmationState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={[styles.yardConfirmationIcon, { backgroundColor: colors.background }]}><Ionicons name="scale-outline" size={26} color={colors.accent} /></View>
           <View style={styles.yardConfirmationCopy}>
-            <Text style={[styles.yardConfirmationTitle, { color: colors.text }]}>Awaiting Yard Weight Confirmation</Text>
-            <Text style={[styles.yardConfirmationMessage, { color: colors.textMuted }]}>Your delivery is recorded. Operations or Yard will confirm the final yard weight. This job is read-only for you.</Text>
+            <Text style={[styles.yardConfirmationTitle, { color: colors.text }]}>{hasYardConfirmation ? 'Yard Weight Confirmed' : 'Awaiting Yard Weight Confirmation'}</Text>
+            <Text style={[styles.yardConfirmationMessage, { color: colors.textMuted }]}>{hasYardConfirmation ? 'Final yard weight has been confirmed by Operations or Yard. No further Driver action is required.' : 'Your delivery is recorded. Operations or Yard will confirm the final yard weight. This job is read-only for you.'}</Text>
             <Text style={[styles.yardWeightLine, { color: colors.text }]}>Driver collected weight: {formatDriverWeight(job.actualCollectedWeight)}</Text>
             {job.finalYardWeight != null ? <Text style={[styles.yardWeightLine, { color: colors.success }]}>Final yard weight: {formatDriverWeight(job.finalYardWeight)}</Text> : null}
           </View>
@@ -452,7 +454,7 @@ export default function DriverActiveJobScreen() {
           {transitionError ? <Text style={[styles.actionError, { color: colors.danger }]}>{transitionError}</Text> : null}
         </View>
       ) : (
-        <View style={[styles.completedState, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={[styles.completedIcon, { backgroundColor: colors.background }]}><Ionicons name="hourglass-outline" size={26} color={colors.accent} /></View><View style={styles.completedCopy}><Text style={[styles.completedTitle, { color: colors.text }]}>Delivery submitted</Text><Text style={[styles.completedMessage, { color: colors.textMuted }]}>Awaiting Operations or Yard confirmation of the final weight. No further Driver action is required.</Text></View></View>
+        <View style={[styles.completedState, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={[styles.completedIcon, { backgroundColor: colors.background }]}><Ionicons name={hasYardConfirmation ? 'checkmark-done' : 'hourglass-outline'} size={26} color={hasYardConfirmation ? colors.success : colors.accent} /></View><View style={styles.completedCopy}><Text style={[styles.completedTitle, { color: colors.text }]}>{hasYardConfirmation ? 'Delivery Complete' : 'Delivery submitted'}</Text><Text style={[styles.completedMessage, { color: colors.textMuted }]}>{hasYardConfirmation ? 'Final yard weight has been confirmed by Operations or Yard. No further Driver action is required.' : 'Awaiting Operations or Yard confirmation of the final weight. No further Driver action is required.'}</Text></View></View>
       )}
 
       <Modal visible={Boolean(photoPreview)} transparent animationType="fade" onRequestClose={() => setPhotoPreview(null)}><Pressable style={styles.previewBackdrop} onPress={() => setPhotoPreview(null)}><Pressable style={[styles.previewCard, { backgroundColor: colors.surface }]} onPress={() => undefined}><View style={styles.previewHeading}><Text style={[styles.previewTitle, { color: colors.text }]}>{photoPreview?.label}</Text><Pressable onPress={() => setPhotoPreview(null)} accessibilityRole="button" accessibilityLabel="Close photo preview" style={[styles.previewClose, { backgroundColor: colors.background }]}><Ionicons name="close" size={22} color={colors.text} /></Pressable></View>{photoPreview ? <Image source={{ uri: photoPreview.uri }} style={styles.previewImage} contentFit="contain" /> : null}</Pressable></Pressable></Modal>

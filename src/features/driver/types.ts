@@ -74,6 +74,9 @@ export interface DriverJob {
   actualCollectedWeight: number | null;
   /** Optional existing RPC field. Drivers can view, never set, the final yard weight. */
   finalYardWeight: number | null;
+  /** Existing yard-confirmation field retained separately from the final-weight alias. */
+  yardConfirmedWeight: number | null;
+  yardConfirmedAt: string | null;
   driverNotes: string | null;
   enRouteAt: string | null;
   arrivedAt: string | null;

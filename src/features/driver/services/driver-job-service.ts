@@ -106,6 +106,7 @@ interface RawDriverJob {
   actual_collected_weight: number | string | null;
   final_yard_weight?: number | string | null;
   yard_confirmed_weight?: number | string | null;
+  yard_confirmed_at?: string | null;
   driver_notes: string | null;
   en_route_at: string | null;
   arrived_at: string | null;
@@ -148,7 +149,8 @@ function mapOptionalWeight(value: number | string | null | undefined): number | 
 }
 
 function mapJob(row: RawDriverJob): DriverJob {
-  const finalYardWeight = row.final_yard_weight ?? row.yard_confirmed_weight ?? null;
+  const yardConfirmedWeight = mapOptionalWeight(row.yard_confirmed_weight);
+  const finalYardWeight = mapOptionalWeight(row.final_yard_weight) ?? yardConfirmedWeight;
   const vehicle: VehicleSummary = {
     id: row.vehicle_id,
     label: row.vehicle_label,
@@ -176,7 +178,9 @@ function mapJob(row: RawDriverJob): DriverJob {
     },
     actualCollectedWeight:
       row.actual_collected_weight == null ? null : Number(row.actual_collected_weight),
-    finalYardWeight: mapOptionalWeight(finalYardWeight),
+    finalYardWeight,
+    yardConfirmedWeight,
+    yardConfirmedAt: row.yard_confirmed_at ?? null,
     driverNotes: row.driver_notes,
     enRouteAt: row.en_route_at,
     arrivedAt: row.arrived_at,

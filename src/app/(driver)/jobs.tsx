@@ -144,7 +144,7 @@ export default function DriverJobsScreen() {
   if (isOffline && !visibleItems.length) return <ScreenScaffold header={<AppHeader title="Jobs" subtitle="Available and accepted pickups" />}><OfflineState message="Connect to the internet to load jobs." onRetry={() => void load(true)} /></ScreenScaffold>;
 
   return (
-    <ScreenScaffold mode="standard" header={<AppHeader title="Jobs" subtitle="Available and accepted pickups" />} contentContainerStyle={styles.screen}>
+    <ScreenScaffold mode="standard" avoidFloatingTabBar={false} header={<AppHeader title="Jobs" subtitle="Available and accepted pickups" />} contentContainerStyle={styles.screen}>
       <View style={[styles.viewBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <ViewTab label="Available Jobs" icon="radio-outline" selected={view === 'available'} onPress={() => switchView('available')} colors={colors} />
         <ViewTab label="My Jobs" icon="briefcase-outline" selected={view === 'mine'} onPress={() => switchView('mine')} colors={colors} />
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
   filterText: { fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.xs },
   notice: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm },
   noticeText: { flex: 1, fontFamily: typography.fontFamily.bodyMedium, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm },
-  list: { paddingBottom: spacing.xl, paddingTop: spacing.sm },
+  list: { paddingBottom: spacing.md, paddingTop: spacing.sm },
   empty: { flexGrow: 1, justifyContent: 'center' },
   listHeader: { minHeight: 54, justifyContent: 'center', paddingBottom: spacing.md },
   listTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg },

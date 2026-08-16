@@ -18,9 +18,11 @@ const STATUS_TONES: Record<DriverExecutionStatus, { background: string; foregrou
 export function DriverStatusPill({
   status,
   inverse = false,
+  label,
 }: {
   status: DriverExecutionStatus;
   inverse?: boolean;
+  label?: string;
 }) {
   const tone = STATUS_TONES[status];
   const isDark = useColorScheme() === 'dark';
@@ -31,7 +33,7 @@ export function DriverStatusPill({
       { backgroundColor: inverse || isDark ? 'rgba(251, 252, 248, 0.12)' : tone.background },
     ]}>
       <Ionicons name={status === 'delivered_to_yard' ? 'checkmark-circle' : 'ellipse'} size={10} color={foreground} />
-      <Text style={[styles.label, { color: foreground }]}>{formatDriverStatus(status)}</Text>
+      <Text style={[styles.label, { color: foreground }]}>{label ?? formatDriverStatus(status)}</Text>
     </View>
   );
 }

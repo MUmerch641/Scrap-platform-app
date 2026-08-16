@@ -17,8 +17,10 @@ export function DriverJobCard({
   onPress: () => void;
   prominent?: boolean;
 }) {
-  const colors = semanticColors[useColorScheme() === 'dark' ? 'dark' : 'light'];
+  const isDark = useColorScheme() === 'dark';
+  const colors = semanticColors[isDark ? 'dark' : 'light'];
   const completed = job.executionStatus === 'delivered_to_yard';
+  const hasYardConfirmation = completed && Boolean(job.yardConfirmedAt);
 
   return (
     <Pressable
@@ -33,7 +35,7 @@ export function DriverJobCard({
           borderColor: prominent ? brandColors.copper : colors.border,
           opacity: pressed ? 0.82 : completed ? 0.78 : 1,
         },
-        Platform.OS === 'android' && styles.androidShadow,
+        Platform.OS === 'android' && !isDark && styles.androidShadow,
       ]}
     >
       <View style={styles.content}>
@@ -42,7 +44,10 @@ export function DriverJobCard({
             <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{job.customerName}</Text>
             <Text style={[styles.schedule, { color: colors.textMuted }]}>{formatDriverScheduleSummary(job.scheduledAt)}</Text>
           </View>
-          <DriverStatusPill status={job.executionStatus} />
+          <DriverStatusPill
+            status={job.executionStatus}
+            label={hasYardConfirmation ? 'Yard Weight Confirmed' : undefined}
+          />
         </View>
 
         <View style={styles.addressRow}>
@@ -51,6 +56,15 @@ export function DriverJobCard({
           </View>
           <Text style={[styles.address, { color: colors.text }]} numberOfLines={2}>{job.pickupAddress}</Text>
         </View>
+
+        {hasYardConfirmation && job.finalYardWeight != null ? (
+          <View style={styles.yardWeightRow}>
+            <Ionicons name="scale-outline" size={14} color={colors.success} />
+            <Text style={[styles.yardWeightText, { color: colors.textMuted }]}>
+              Final yard weight: {formatDriverWeight(job.finalYardWeight)}
+            </Text>
+          </View>
+        ) : null}
 
         <View style={[styles.metaRow, { borderTopColor: colors.border }]}>
           <Meta icon="cube-outline" value={job.materialType} colors={colors} />
@@ -90,6 +104,8 @@ const styles = StyleSheet.create({
   addressRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   iconDisc: { width: 32, height: 32, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
   address: { flex: 1, fontFamily: typography.fontFamily.bodyMedium, fontSize: typography.fontSize.sm, lineHeight: typography.lineHeight.sm },
+  yardWeightRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  yardWeightText: { fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.xs },
   metaRow: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: spacing.sm },
   meta: { flex: 1, minWidth: 0, maxWidth: 92, flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaGrow: { flex: 1, maxWidth: undefined },

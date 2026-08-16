@@ -66,12 +66,14 @@ export default function DriverLayout() {
       // On iOS the native UITabBarController adapts to system appearance automatically;
       // remounting here would destroy tab state and flash the screen.
       key={Platform.OS === 'android' ? (colorScheme ?? 'light') : undefined}
-      backgroundColor={Platform.OS === 'ios' ? undefined : colors.surface}
+      backgroundColor={Platform.OS === 'ios' ? undefined : colors.background}
       tintColor={colors.accent}
       iconColor={{
         default: colors.textMuted,
         selected: colors.accent
       }}
+      indicatorColor={Platform.OS === 'android' ? colors.background : undefined}
+      rippleColor={Platform.OS === 'android' ? 'transparent' : undefined}
       labelStyle={
         Platform.OS === 'ios'
           ? {
