@@ -12,6 +12,8 @@ const DRIVER_JOB_DETAIL_TYPES = new Set([
   'driver_job_assigned',
   'driver_pickup_rescheduled',
   'driver_yard_weight_confirmed',
+  'driver_support_resolved',
+  'driver_support_rejected',
 ]);
 
 const SALES_REP_PICKUP_TYPES = new Set([
@@ -75,6 +77,7 @@ function openSalesRepNotification(notification: Notifications.Notification) {
 
 export function PushNotificationManager() {
   const { user, role, isActive } = useUserRole();
+  const handledResponseIdsRef = React.useRef(new Set<string>());
 
   React.useEffect(() => {
     if (!user || !isActive || (role !== ROLES.DRIVER && role !== ROLES.SALES_REP)) return;
@@ -90,19 +93,37 @@ export function PushNotificationManager() {
 
   React.useEffect(() => {
     if (role !== ROLES.DRIVER) return;
-    void Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (response?.notification) openDriverNotification(response.notification);
-    });
-    const subscription = Notifications.addNotificationResponseReceivedListener((response) => openDriverNotification(response.notification));
+
+    const handleDriverResponse = (response: Notifications.NotificationResponse | null) => {
+      if (!response?.notification) return;
+      const identifier =
+        response.notification.request.identifier ||
+        `${response.notification.date}-${JSON.stringify(response.notification.request.content.data ?? {})}`;
+      if (handledResponseIdsRef.current.has(identifier)) return;
+      handledResponseIdsRef.current.add(identifier);
+      openDriverNotification(response.notification);
+    };
+
+    void Notifications.getLastNotificationResponseAsync().then(handleDriverResponse);
+    const subscription = Notifications.addNotificationResponseReceivedListener(handleDriverResponse);
     return () => subscription.remove();
   }, [role]);
 
   React.useEffect(() => {
     if (role !== ROLES.SALES_REP) return;
-    void Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (response?.notification) openSalesRepNotification(response.notification);
-    });
-    const subscription = Notifications.addNotificationResponseReceivedListener((response) => openSalesRepNotification(response.notification));
+
+    const handleSalesRepResponse = (response: Notifications.NotificationResponse | null) => {
+      if (!response?.notification) return;
+      const identifier =
+        response.notification.request.identifier ||
+        `${response.notification.date}-${JSON.stringify(response.notification.request.content.data ?? {})}`;
+      if (handledResponseIdsRef.current.has(identifier)) return;
+      handledResponseIdsRef.current.add(identifier);
+      openSalesRepNotification(response.notification);
+    };
+
+    void Notifications.getLastNotificationResponseAsync().then(handleSalesRepResponse);
+    const subscription = Notifications.addNotificationResponseReceivedListener(handleSalesRepResponse);
     return () => subscription.remove();
   }, [role]);
 

@@ -2,6 +2,8 @@ import * as Location from 'expo-location';
 
 import { DriverCoordinate } from '../types';
 
+import { Platform } from 'react-native';
+
 export type DriverLocationPermission = Location.LocationPermissionResponse;
 export type DriverLocationSubscription = Location.LocationSubscription;
 
@@ -14,6 +16,16 @@ export function toDriverCoordinate(location: Location.LocationObject): DriverCoo
 
 export async function areDriverLocationServicesEnabled(): Promise<boolean> {
   return Location.hasServicesEnabledAsync();
+}
+
+export async function promptEnableDriverLocationServices(): Promise<void> {
+  if (Platform.OS === 'android') {
+    try {
+      await Location.enableNetworkProviderAsync();
+    } catch {
+      // User cancelled dialog
+    }
+  }
 }
 
 export async function getDriverLocationPermission(): Promise<DriverLocationPermission> {

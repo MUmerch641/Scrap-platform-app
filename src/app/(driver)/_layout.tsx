@@ -2,6 +2,13 @@ import { useUserRole } from '@/context/UserRoleContext';
 import { useNetworkStatus } from '@/context/NetworkStatusContext';
 import { AuthLoadingScreen } from '@/components/auth/auth-loading-screen';
 import { DriverJobRealtimeSubscription, subscribeToDriverJobRealtime } from '@/features/driver/services/driver-job-realtime';
+import {
+  notifyDriverLiveLocationNetworkReconnect,
+  stopDriverLiveTracking,
+  syncDriverLiveTracking,
+} from '@/features/driver/services/driver-live-location-service';
+import { fetchDriverJobs } from '@/features/driver/services/driver-job-service';
+import { subscribeToDriverJobsChanged } from '@/features/driver/services/driver-job-refresh';
 import { ROLES } from '@/shared/roles';
 import { semanticColors, typography } from '@/shared/theme';
 import { Redirect } from 'expo-router';
@@ -32,6 +39,44 @@ export default function DriverLayout() {
 
   useEffect(() => {
     if (!driverSessionId) {
+      void stopDriverLiveTracking({ clearDbLocation: true });
+      return;
+    }
+
+    let isMounted = true;
+    const syncActiveJobTracking = async () => {
+      if (AppState.currentState !== 'active') return;
+      try {
+        const result = await fetchDriverJobs({
+          page: 0,
+          pageSize: 1,
+          executionStatuses: ['en_route', 'arrived', 'material_collected', 'assigned'],
+        });
+        if (!isMounted) return;
+        if (result.success && result.jobs.length > 0) {
+          const activeJob = result.jobs[0];
+          void syncDriverLiveTracking(activeJob.id, activeJob.executionStatus);
+        } else if (result.success) {
+          void syncDriverLiveTracking(null, null);
+        }
+      } catch {
+        // Handled silently
+      }
+    };
+
+    void syncActiveJobTracking();
+    const unsubscribe = subscribeToDriverJobsChanged(() => {
+      void syncActiveJobTracking();
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [driverSessionId]);
+
+  useEffect(() => {
+    if (!driverSessionId) {
       hasObservedNetworkRef.current = false;
       return;
     }
@@ -39,7 +84,10 @@ export default function DriverLayout() {
       hasObservedNetworkRef.current = true;
       return;
     }
-    if (isOnline) realtimeRef.current?.scheduleRefresh();
+    if (isOnline) {
+      realtimeRef.current?.scheduleRefresh();
+      notifyDriverLiveLocationNetworkReconnect();
+    }
   }, [driverSessionId, isOnline]);
 
   useEffect(() => {

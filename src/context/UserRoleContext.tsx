@@ -25,6 +25,7 @@ import {
 } from '@/services/supabase-client';
 import { Role } from '@/shared/roles';
 import { unregisterCurrentDevicePushToken } from '@/services/push-notification-service';
+import { stopDriverLiveTracking } from '@/features/driver/services/driver-live-location-service';
 
 interface UserRoleContextProps {
   session: Session | null;
@@ -357,6 +358,11 @@ export const UserRoleProvider = ({ children }: { children: ReactNode }) => {
   const signOut = useCallback(async () => {
     try {
       await unregisterCurrentDevicePushToken();
+    } catch {
+      // Best-effort cleanup must not trap a user in a signed-in state while offline.
+    }
+    try {
+      await stopDriverLiveTracking({ clearDbLocation: true });
     } catch {
       // Best-effort cleanup must not trap a user in a signed-in state while offline.
     }

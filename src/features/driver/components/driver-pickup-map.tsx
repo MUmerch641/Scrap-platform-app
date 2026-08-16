@@ -21,6 +21,7 @@ import {
   getCurrentDriverLocation,
   getDriverLocationPermission,
   getRecentDriverLocation,
+  promptEnableDriverLocationServices,
   requestDriverLocationPermission,
   toDriverCoordinate,
   watchVisibleDriverLocation,
@@ -126,11 +127,11 @@ export function DriverPickupMap({
 
       let permission = await getDriverLocationPermission();
       if (session !== locationSessionRef.current) return;
-      if (
-        permission.status === 'undetermined' ||
-        (requestAfterDenial && permission.status === 'denied' && permission.canAskAgain)
-      ) {
+      if (requestAfterDenial && !permission.granted) {
         permission = await requestDriverLocationPermission();
+        if (!permission.granted && !permission.canAskAgain) {
+          void Linking.openSettings();
+        }
       }
       if (session !== locationSessionRef.current) return;
       setCanAskAgain(permission.canAskAgain);
@@ -302,8 +303,10 @@ export function DriverPickupMap({
   }, [displayedPickupCoordinate, driverCoordinate]);
 
   const locationMessage = getLocationMessage(locationState);
-  const action = getLocationAction(locationState, canAskAgain);
+  const action = getLocationAction(locationState);
   const routeMessage = getRouteMessage(routeState, isQaCoordinate);
+
+  const ENABLE_MAP = false;
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -327,67 +330,75 @@ export function DriverPickupMap({
 
       <View style={[styles.mapFrame, { backgroundColor: colors.background, borderColor: colors.border }]}>
         {initialRegion ? (
-          <MapView
-            ref={mapRef}
-            style={StyleSheet.absoluteFill}
-            initialRegion={initialRegion}
-            loadingEnabled
-            loadingBackgroundColor={colors.background}
-            loadingIndicatorColor={colors.accent}
-            mapType="standard"
-            toolbarEnabled={false}
-            showsCompass={false}
-            showsIndoorLevelPicker={false}
-            showsIndoors={false}
-            showsMyLocationButton={false}
-            showsPointsOfInterests={false}
-            showsScale={false}
-            showsTraffic={false}
-            rotateEnabled={false}
-            pitchEnabled={false}
-            onMapReady={() => setMapReady(true)}
-          >
-            {routeState.status === 'ready' ? (
-              <>
-                <Polyline
-                  coordinates={routeState.route.coordinates}
-                  strokeColor={brandColors.navy}
-                  strokeWidth={8}
-                  lineCap="round"
-                  lineJoin="round"
-                />
-                <Polyline
-                  coordinates={routeState.route.coordinates}
-                  strokeColor={brandColors.copper}
-                  strokeWidth={4}
-                  lineCap="round"
-                  lineJoin="round"
-                />
-              </>
-            ) : null}
-            {driverCoordinate ? (
-              <Marker coordinate={driverCoordinate} title="Your location" anchor={{ x: 0.5, y: 0.5 }}>
-                <View style={styles.driverMarkerOuter}>
-                  <View style={styles.driverMarkerInner} />
-                </View>
-              </Marker>
-            ) : null}
-            {displayedPickupCoordinate ? (
-              <Marker
-                coordinate={displayedPickupCoordinate}
-                title={isQaCoordinate ? 'QA pickup location' : 'Pickup location'}
-                description={pickupAddress}
-                anchor={{ x: 0.5, y: 1 }}
-              >
-                <View style={styles.pickupMarker}>
-                  <View style={styles.pickupMarkerHead}>
-                    <Ionicons name="cube-outline" size={17} color={brandColors.white} />
+          ENABLE_MAP ? (
+            <MapView
+              ref={mapRef}
+              style={StyleSheet.absoluteFill}
+              initialRegion={initialRegion}
+              loadingEnabled
+              loadingBackgroundColor={colors.background}
+              loadingIndicatorColor={colors.accent}
+              mapType="standard"
+              toolbarEnabled={false}
+              showsCompass={false}
+              showsIndoorLevelPicker={false}
+              showsIndoors={false}
+              showsMyLocationButton={false}
+              showsPointsOfInterests={false}
+              showsScale={false}
+              showsTraffic={false}
+              rotateEnabled={false}
+              pitchEnabled={false}
+              onMapReady={() => setMapReady(true)}
+            >
+              {routeState.status === 'ready' ? (
+                <>
+                  <Polyline
+                    coordinates={routeState.route.coordinates}
+                    strokeColor={brandColors.navy}
+                    strokeWidth={8}
+                    lineCap="round"
+                    lineJoin="round"
+                  />
+                  <Polyline
+                    coordinates={routeState.route.coordinates}
+                    strokeColor={brandColors.copper}
+                    strokeWidth={4}
+                    lineCap="round"
+                    lineJoin="round"
+                  />
+                </>
+              ) : null}
+              {driverCoordinate ? (
+                <Marker coordinate={driverCoordinate} title="Your location" anchor={{ x: 0.5, y: 0.5 }}>
+                  <View style={styles.driverMarkerOuter}>
+                    <View style={styles.driverMarkerInner} />
                   </View>
-                  <View style={styles.pickupMarkerTail} />
-                </View>
-              </Marker>
-            ) : null}
-          </MapView>
+                </Marker>
+              ) : null}
+              {displayedPickupCoordinate ? (
+                <Marker
+                  coordinate={displayedPickupCoordinate}
+                  title={isQaCoordinate ? 'QA pickup location' : 'Pickup location'}
+                  description={pickupAddress}
+                  anchor={{ x: 0.5, y: 1 }}
+                >
+                  <View style={styles.pickupMarker}>
+                    <View style={styles.pickupMarkerHead}>
+                      <Ionicons name="cube-outline" size={17} color={brandColors.white} />
+                    </View>
+                    <View style={styles.pickupMarkerTail} />
+                  </View>
+                </Marker>
+              ) : null}
+            </MapView>
+          ) : (
+            <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }]}>
+              <Ionicons name="map-outline" size={32} color={colors.accent} style={{ opacity: 0.6, marginBottom: spacing.sm }} />
+              <Text style={{ fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.sm, color: colors.text }}>Map temporarily disabled</Text>
+              <Text style={{ fontFamily: typography.fontFamily.body, fontSize: typography.fontSize.xs, color: colors.textMuted, textAlign: 'center', marginTop: spacing.xs, paddingHorizontal: spacing.lg }}>Live tracking and route calculations remain active.</Text>
+            </View>
+          )
         ) : (
           <MapState
             title={locationMessage.title}
@@ -395,7 +406,15 @@ export function DriverPickupMap({
             loading={locationState === 'checking'}
             actionLabel={action}
             onAction={() => {
-              if (action === 'Open Settings') void Linking.openSettings();
+              if (action === 'Turn On GPS') {
+                void (async () => {
+                  await promptEnableDriverLocationServices();
+                  void beginLocationSession(true);
+                })();
+              }
+              else if (action === 'Allow Location') {
+                void beginLocationSession(true);
+              }
               else void beginLocationSession(true);
             }}
             colors={colors}
@@ -408,7 +427,15 @@ export function DriverPickupMap({
             message={locationMessage.message}
             actionLabel={action}
             onAction={() => {
-              if (action === 'Open Settings') void Linking.openSettings();
+              if (action === 'Turn On GPS') {
+                void (async () => {
+                  await promptEnableDriverLocationServices();
+                  void beginLocationSession(true);
+                })();
+              }
+              else if (action === 'Allow Location') {
+                void beginLocationSession(true);
+              }
               else void beginLocationSession(true);
             }}
             colors={colors}
@@ -598,9 +625,9 @@ function getLocationMessage(state: LocationState): { title: string; message: str
   }
 }
 
-function getLocationAction(state: LocationState, canAskAgain: boolean): string | undefined {
-  if (state === 'services-disabled') return 'Open Settings';
-  if (state === 'denied') return canAskAgain ? 'Try Again' : 'Open Settings';
+function getLocationAction(state: LocationState): string | undefined {
+  if (state === 'services-disabled') return 'Turn On GPS';
+  if (state === 'denied') return 'Allow Location';
   if (state === 'unavailable') return 'Retry';
   return undefined;
 }

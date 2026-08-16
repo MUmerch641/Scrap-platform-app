@@ -36,23 +36,32 @@ export default function DriverHomeScreen() {
     if (isOffline) { setLoading(false); return; }
     const id = ++requestId.current;
     setError(null);
-    const today = formatDriverLocalDate(new Date());
-    const [active, next, summary] = await Promise.all([
-      fetchDriverJobs({ page: 0, pageSize: 2, executionStatuses: ACTIVE_STATUSES }),
-      fetchDriverJobs({ page: 0, pageSize: 1, scheduledFrom: today, executionStatuses: ['assigned'] }),
-      fetchDriverJobSummary(today),
-    ]);
-    if (id !== requestId.current) return;
-    if (active.success) setActiveJobs(active.jobs);
-    if (next.success) setNextJob(next.jobs[0] ?? null);
-    if (summary.success) setCounts({ today: summary.todayJobs, completed: summary.completedToday });
-    const firstError = active.error ?? next.error ?? summary.error;
-    if (firstError && !active.success && !next.success && !summary.success) setError(firstError);
-    setLoading(false);
+    try {
+      const today = formatDriverLocalDate(new Date());
+      const [active, next, summary] = await Promise.all([
+        fetchDriverJobs({ page: 0, pageSize: 2, executionStatuses: ACTIVE_STATUSES }),
+        fetchDriverJobs({ page: 0, pageSize: 1, scheduledFrom: today, executionStatuses: ['assigned'] }),
+        fetchDriverJobSummary(today),
+      ]);
+      if (id !== requestId.current) return;
+      if (active.success) setActiveJobs(active.jobs);
+      if (next.success) setNextJob(next.jobs[0] ?? null);
+      if (summary.success) setCounts({ today: summary.todayJobs, completed: summary.completedToday });
+      const firstError = active.error ?? next.error ?? summary.error;
+      if (firstError && !active.success && !next.success && !summary.success) setError(firstError);
+    } catch {
+      if (id === requestId.current) {
+        setError('Unable to load your shift.');
+      }
+    } finally {
+      if (id === requestId.current) {
+        setLoading(false);
+      }
+    }
   }, [isOffline]);
 
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
-  React.useEffect(() => subscribeToDriverJobsChanged(() => load()), [load]);
+  useFocusEffect(useCallback(() => { void load(); return () => { requestId.current += 1; }; }, [load]));
+  React.useEffect(() => subscribeToDriverJobsChanged(() => { void load(); }), [load]);
 
   const openJob = (job: DriverJob) => router.push({ pathname: '/(driver)/active-job', params: { jobId: job.id } });
   const activeJob = activeJobs[0] ?? null;

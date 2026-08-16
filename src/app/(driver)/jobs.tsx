@@ -57,26 +57,34 @@ export default function DriverJobsScreen() {
     if (refresh) setRefreshing(true); else if (!quiet) setLoading(true);
     setError(null);
 
-    if (view === 'available') {
-      const result = await fetchAvailableDriverJobs(0);
-      if (id !== requestId.current) return;
-      if (result.success) { setAvailableJobs(result.jobs); setAvailableHasMore(result.hasMore); }
-      else setError(result.error ?? 'Unable to load available jobs.');
-    } else {
-      const [result, active] = await Promise.all([
-        fetchDriverJobs(optionsFor(filter, 0)),
-        filter === 'today' ? fetchDriverJobs({ page: 0, pageSize: 2, executionStatuses: ACTIVE_STATUSES }) : Promise.resolve(null),
-      ]);
-      if (id !== requestId.current) return;
-      if (result.success) {
-        const firstPageJobs = active?.success ? [...active.jobs, ...result.jobs.filter((job) => !active.jobs.some((activeJob) => activeJob.id === job.id))] : result.jobs;
-        setJobs(firstPageJobs);
-        setHasMore(result.hasMore);
-      } else setError(result.error ?? 'Unable to load accepted jobs.');
+    try {
+      if (view === 'available') {
+        const result = await fetchAvailableDriverJobs(0);
+        if (id !== requestId.current) return;
+        if (result.success) { setAvailableJobs(result.jobs); setAvailableHasMore(result.hasMore); }
+        else setError(result.error ?? 'Unable to load available jobs.');
+      } else {
+        const [result, active] = await Promise.all([
+          fetchDriverJobs(optionsFor(filter, 0)),
+          filter === 'today' ? fetchDriverJobs({ page: 0, pageSize: 2, executionStatuses: ACTIVE_STATUSES }) : Promise.resolve(null),
+        ]);
+        if (id !== requestId.current) return;
+        if (result.success) {
+          const firstPageJobs = active?.success ? [...active.jobs, ...result.jobs.filter((job) => !active.jobs.some((activeJob) => activeJob.id === job.id))] : result.jobs;
+          setJobs(firstPageJobs);
+          setHasMore(result.hasMore);
+        } else setError(result.error ?? 'Unable to load accepted jobs.');
+      }
+    } catch {
+      if (id === requestId.current) {
+        setError('Unable to load jobs. Check your connection and try again.');
+      }
+    } finally {
+      if (id === requestId.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-
-    if (!quiet) setLoading(false);
-    setRefreshing(false);
   }, [filter, isOffline, view]);
 
   useFocusEffect(useCallback(() => { void load(); return () => { requestId.current += 1; }; }, [load]));
@@ -88,20 +96,25 @@ export default function DriverJobsScreen() {
     if (view === 'mine' && !hasMore) return;
     setLoadingMore(true);
     const id = ++requestId.current;
-    if (view === 'available') {
-      const result = await fetchAvailableDriverJobs(Math.ceil(availableJobs.length / DRIVER_JOB_PAGE_SIZE));
-      if (id === requestId.current && result.success) {
-        setAvailableJobs((previous) => [...previous, ...result.jobs.filter((job) => !previous.some((existing) => existing.id === job.id))]);
-        setAvailableHasMore(result.hasMore);
+    try {
+      if (view === 'available') {
+        const result = await fetchAvailableDriverJobs(Math.ceil(availableJobs.length / DRIVER_JOB_PAGE_SIZE));
+        if (id === requestId.current && result.success) {
+          setAvailableJobs((previous) => [...previous, ...result.jobs.filter((job) => !previous.some((existing) => existing.id === job.id))]);
+          setAvailableHasMore(result.hasMore);
+        }
+      } else {
+        const result = await fetchDriverJobs(optionsFor(filter, Math.ceil(jobs.length / DRIVER_JOB_PAGE_SIZE)));
+        if (id === requestId.current && result.success) {
+          setJobs((previous) => [...previous, ...result.jobs.filter((job) => !previous.some((existing) => existing.id === job.id))]);
+          setHasMore(result.hasMore);
+        }
       }
-    } else {
-      const result = await fetchDriverJobs(optionsFor(filter, Math.ceil(jobs.length / DRIVER_JOB_PAGE_SIZE)));
-      if (id === requestId.current && result.success) {
-        setJobs((previous) => [...previous, ...result.jobs.filter((job) => !previous.some((existing) => existing.id === job.id))]);
-        setHasMore(result.hasMore);
+    } finally {
+      if (id === requestId.current) {
+        setLoadingMore(false);
       }
     }
-    setLoadingMore(false);
   };
 
   const accept = async (jobId: string) => {

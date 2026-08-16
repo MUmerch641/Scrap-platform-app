@@ -13,8 +13,19 @@ import { DriverJobPhotoSection } from '@/features/driver/components/driver-job-p
 import { DriverJobProgress } from '@/features/driver/components/driver-job-progress';
 import { DriverPickupMap } from '@/features/driver/components/driver-pickup-map';
 import { DriverStatusPill } from '@/features/driver/components/driver-status-pill';
+import { DriverSupportModal } from '@/features/driver/components/driver-support-modal';
 import { fetchDriverJobPhotos, uploadDriverJobPhoto, validatePendingDriverPhoto } from '@/features/driver/services/driver-job-photo-service';
-import { getQaPickupCoordinate } from '@/features/driver/services/driver-location-service';
+import {
+  getQaPickupCoordinate,
+  promptEnableDriverLocationServices,
+  requestDriverLocationPermission,
+} from '@/features/driver/services/driver-location-service';
+import {
+  isTrackableDriverJobStatus,
+  stopDriverLiveTracking,
+  syncDriverLiveTracking,
+  useDriverLiveTrackingStatus,
+} from '@/features/driver/services/driver-live-location-service';
 import {
   fetchDriverJobs,
   recordDriverMaterialCollection,
@@ -82,6 +93,7 @@ export default function DriverActiveJobScreen() {
   const jobId = firstRouteValue(routePickupJobId) ?? firstRouteValue(legacyRouteJobId);
   const { isOffline } = useNetworkStatus();
   const colors = semanticColors[useColorScheme() === 'dark' ? 'dark' : 'light'];
+  const trackingStatus = useDriverLiveTrackingStatus();
   const [job, setJob] = useState<DriverJob | null>(null);
   const [loading, setLoading] = useState(true);
   const [screenState, setScreenState] = useState<ScreenState>('ready');
@@ -98,6 +110,7 @@ export default function DriverActiveJobScreen() {
   const hasLoadedJobRef = useRef(false);
   const transitioningRef = useRef(false);
   const uploadingPhotoIdsRef = useRef(new Set<string>());
+  const [supportModalVisible, setSupportModalVisible] = useState(false);
 
   const refreshPhotos = useCallback(async (nextJobId: string) => {
     if (isOffline) return;
@@ -113,33 +126,46 @@ export default function DriverActiveJobScreen() {
       source: routePickupJobId ? 'pickupJobId' : legacyRouteJobId ? 'jobId' : 'none',
     });
     const id = ++requestId.current;
+    setLoading(true);
     setScreenState('ready');
     setTransitionError(null);
-    const result = await fetchDriverJobs({ page: 0, pageSize: 99, jobId, executionStatuses: jobId ? undefined : ACTIVE_STATUSES });
-    if (id !== requestId.current) return;
-    if (__DEV__) console.log('[driver-active-job] detail result', { p_job_id: jobId ?? null, success: result.success, jobCount: result.jobs.length, error: result.error, job: result.jobs[0] ?? null });
-    if (!result.success) { if (!hasLoadedJobRef.current) setScreenState('error'); setLoading(false); return; }
-    const assignedJobs = result.jobs.filter((candidate) => candidate.executionStatus === 'assigned');
-    if (!jobId && (assignedJobs.length > 1 || (assignedJobs.length === 0 && result.jobs.length > 1))) {
-      setJob(null);
-      hasLoadedJobRef.current = false;
-      setScreenState('conflict');
-      setLoading(false);
-      return;
+    try {
+      const result = await fetchDriverJobs({ page: 0, pageSize: 99, jobId, executionStatuses: jobId ? undefined : ACTIVE_STATUSES });
+      if (id !== requestId.current) return;
+      if (__DEV__) console.log('[driver-active-job] detail result', { p_job_id: jobId ?? null, success: result.success, jobCount: result.jobs.length, error: result.error, job: result.jobs[0] ?? null });
+      if (!result.success) {
+        if (!hasLoadedJobRef.current) setScreenState('error');
+        return;
+      }
+      const assignedJobs = result.jobs.filter((candidate) => candidate.executionStatus === 'assigned');
+      if (!jobId && (assignedJobs.length > 1 || (assignedJobs.length === 0 && result.jobs.length > 1))) {
+        setJob(null);
+        hasLoadedJobRef.current = false;
+        setScreenState('conflict');
+        return;
+      }
+      const nextJob = jobId ? result.jobs[0] ?? null : assignedJobs[0] ?? result.jobs[0] ?? null;
+      setJob(nextJob);
+      void syncDriverLiveTracking(nextJob?.id ?? null, nextJob?.executionStatus ?? null);
+      if (nextJob) void refreshPhotos(nextJob.id);
+      else setPhotos([]);
+      hasLoadedJobRef.current = result.jobs.length > 0;
+      setScreenState(result.jobs.length ? 'ready' : 'unavailable');
+    } catch {
+      if (id === requestId.current && !hasLoadedJobRef.current) {
+        setScreenState('error');
+      }
+    } finally {
+      if (id === requestId.current) {
+        setLoading(false);
+      }
     }
-    const nextJob = jobId ? result.jobs[0] ?? null : assignedJobs[0] ?? result.jobs[0] ?? null;
-    setJob(nextJob);
-    if (nextJob) void refreshPhotos(nextJob.id);
-    else setPhotos([]);
-    hasLoadedJobRef.current = result.jobs.length > 0;
-    setScreenState(result.jobs.length ? 'ready' : 'unavailable');
-    setLoading(false);
   }, [isOffline, jobId, legacyRouteJobId, refreshPhotos, routePickupJobId]);
 
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  useFocusEffect(useCallback(() => { void load(); return () => { requestId.current += 1; }; }, [load]));
 
   useEffect(
-    () => subscribeToDriverJobsChanged(() => load()),
+    () => subscribeToDriverJobsChanged(() => { void load(); }),
     [load],
   );
 
@@ -241,9 +267,10 @@ export default function DriverActiveJobScreen() {
     try {
       const url = `mailto:${job.customerEmail.trim()}`;
       await Linking.openURL(url);
-    } catch { showErrorMessage('Unable to open an email app. Please try again on a supported device.', 'Email unavailable'); }
+    } catch {
+      showErrorMessage('Unable to open an email app. Please try again on a supported device.', 'Email unavailable');
+    }
   };
-
   const submitTransition = useCallback(async (targetStatus: DriverJob['executionStatus']) => {
     if (!job || transitioningRef.current || isOffline) return;
 
@@ -260,11 +287,16 @@ export default function DriverActiveJobScreen() {
         setJob(null);
         hasLoadedJobRef.current = false;
         setScreenState('unavailable');
+        void stopDriverLiveTracking({ clearDbLocation: true });
       } else {
         await load();
       }
       showErrorMessage(result.error ?? 'Unable to update this job.', 'Job update');
       return;
+    }
+
+    if (targetStatus === 'delivered_to_yard') {
+      void stopDriverLiveTracking({ clearDbLocation: true });
     }
 
     await load();
@@ -295,6 +327,7 @@ export default function DriverActiveJobScreen() {
         setJob(null);
         hasLoadedJobRef.current = false;
         setScreenState('unavailable');
+        void stopDriverLiveTracking({ clearDbLocation: true });
       } else {
         await load();
         setTransitionError(message);
@@ -355,6 +388,11 @@ export default function DriverActiveJobScreen() {
   const nextAction = NEXT_ACTIONS[job.executionStatus];
   const qaPickupCoordinate = job.pickupCoordinate ? null : getQaPickupCoordinate();
   const pickupCoordinate = job.pickupCoordinate ?? qaPickupCoordinate;
+  const showLocationWarning =
+    Boolean(job) &&
+    isTrackableDriverJobStatus(job?.executionStatus) &&
+    (trackingStatus === 'services-disabled' || trackingStatus === 'permission-denied');
+
   return (
     <ScreenScaffold mode="form" header={<AppHeader title={isDelivered ? 'Job Details' : 'Active Job'} subtitle={job.customerName} />} contentContainerStyle={styles.content} androidKeyboardAvoidance>
       <View style={styles.overviewHero}>
@@ -372,6 +410,57 @@ export default function DriverActiveJobScreen() {
         <View style={styles.nextStepBanner}>
           <Text style={[styles.nextStepLabel, { color: colors.textMuted }]}>Next step</Text>
           <View style={styles.nextStepCopy}><Text style={[styles.nextStepTitle, { color: colors.text }]}>{nextAction.title}</Text><Text style={[styles.nextStepText, { color: colors.textMuted }]}>{nextStepDescription(job.executionStatus)}</Text></View>
+        </View>
+      ) : null}
+
+      {!isDelivered ? (
+        <Pressable
+          onPress={() => setSupportModalVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Request support for this job"
+          style={({ pressed }) => [
+            styles.supportButton,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              opacity: pressed ? 0.72 : 1,
+            },
+          ]}
+        >
+          <Ionicons name="headset-outline" size={17} color={colors.accent} />
+          <Text style={[styles.supportButtonText, { color: colors.text }]}>Request Support</Text>
+          <Ionicons name="chevron-forward" size={15} color={colors.textMuted} />
+        </Pressable>
+      ) : null}
+
+      {showLocationWarning ? (
+        <View style={[styles.locationWarning, { backgroundColor: colors.surface, borderColor: colors.warning }]}>
+          <Ionicons name="location-outline" size={20} color={colors.warning} />
+          <View style={styles.locationWarningCopy}>
+            <Text style={[styles.locationWarningTitle, { color: colors.text }]}>
+              Location access needed
+            </Text>
+            <Text style={[styles.locationWarningMessage, { color: colors.textMuted }]}>
+              Allow location access so Operations can track your pickup progress.
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => {
+              void (async () => {
+                await promptEnableDriverLocationServices();
+                await requestDriverLocationPermission();
+                if (job) {
+                  await syncDriverLiveTracking(job.id, job.executionStatus);
+                }
+              })();
+            }}
+            style={({ pressed }) => [styles.locationWarningButton, { backgroundColor: brandColors.navy, opacity: pressed ? 0.8 : 1 }]}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.locationWarningButtonText, { color: brandColors.white }]}>
+              Allow Location
+            </Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -458,6 +547,12 @@ export default function DriverActiveJobScreen() {
       )}
 
       <Modal visible={Boolean(photoPreview)} transparent animationType="fade" onRequestClose={() => setPhotoPreview(null)}><Pressable style={styles.previewBackdrop} onPress={() => setPhotoPreview(null)}><Pressable style={[styles.previewCard, { backgroundColor: colors.surface }]} onPress={() => undefined}><View style={styles.previewHeading}><Text style={[styles.previewTitle, { color: colors.text }]}>{photoPreview?.label}</Text><Pressable onPress={() => setPhotoPreview(null)} accessibilityRole="button" accessibilityLabel="Close photo preview" style={[styles.previewClose, { backgroundColor: colors.background }]}><Ionicons name="close" size={22} color={colors.text} /></Pressable></View>{photoPreview ? <Image source={{ uri: photoPreview.uri }} style={styles.previewImage} contentFit="contain" /> : null}</Pressable></Pressable></Modal>
+
+      <DriverSupportModal
+        visible={supportModalVisible}
+        jobId={job.id}
+        onClose={() => setSupportModalVisible(false)}
+      />
     </ScreenScaffold>
   );
 }
@@ -479,6 +574,8 @@ const styles = StyleSheet.create({
   nextStepCopy: { flex: 1, gap: 2 },
   nextStepTitle: { fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.md },
   nextStepText: { fontFamily: typography.fontFamily.body, fontSize: typography.fontSize.xs, lineHeight: typography.lineHeight.xs },
+  supportButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, minHeight: 44 },
+  supportButtonText: { flex: 1, fontFamily: typography.fontFamily.bodySemibold, fontSize: typography.fontSize.sm },
   section: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.md },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   sectionHeadingCopy: { flex: 1, gap: 2 },
@@ -527,4 +624,36 @@ const styles = StyleSheet.create({
   previewTitle: { flex: 1, fontFamily: typography.fontFamily.headingSemibold, fontSize: typography.fontSize.lg },
   previewClose: { width: 40, height: 40, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
   previewImage: { width: '100%', aspectRatio: 0.82 },
+  locationWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
+  locationWarningCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  locationWarningTitle: {
+    fontFamily: typography.fontFamily.headingSemibold,
+    fontSize: typography.fontSize.sm,
+  },
+  locationWarningMessage: {
+    fontFamily: typography.fontFamily.body,
+    fontSize: typography.fontSize.xs,
+    lineHeight: typography.lineHeight.xs,
+  },
+  locationWarningButton: {
+    minHeight: 34,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  locationWarningButtonText: {
+    fontFamily: typography.fontFamily.bodySemibold,
+    fontSize: typography.fontSize.xs,
+  },
 });

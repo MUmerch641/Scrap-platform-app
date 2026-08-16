@@ -9,6 +9,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     slug: config.slug ?? 'mobile',
     android: {
       ...(config.android ?? {}),
+      config: {
+        googleMaps: {
+          apiKey: androidGoogleMapsApiKey ?? '',
+        },
+      },
       googleServicesFile: './google-services.json',
     },
     plugins: [
