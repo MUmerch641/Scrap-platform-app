@@ -408,7 +408,7 @@ export default function CustomerFormScreen() {
 
 const styles = StyleSheet.create({
   formScrollContent: {
-    paddingBottom: 340,
+    paddingBottom: 120,
   },
   formContainer: {
     padding: spacing.md,
