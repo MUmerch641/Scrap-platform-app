@@ -108,7 +108,6 @@ export default function PickupDetailsScreen() {
   return (
     <ScreenScaffold
       mode="scroll"
-      iosNativeHeader
       header={(
         <AppHeader
           title={request?.customerName ?? 'Pickup Details'}

@@ -305,7 +305,6 @@ export default function MyPickupsScreen() {
   return (
     <ScreenScaffold
       mode="standard"
-      iosNativeHeader
       contentContainerStyle={styles.screenContent}
       header={(
         <AppHeader
