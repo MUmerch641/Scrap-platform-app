@@ -299,7 +299,7 @@ export default function CustomerFormScreen() {
 
   return (
     <ScreenScaffold
-      mode="scroll"
+      mode="form"
       iosNativeHeader
       contentContainerStyle={styles.formScrollContent}
       header={
