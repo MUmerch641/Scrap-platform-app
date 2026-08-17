@@ -299,8 +299,9 @@ export default function CustomerFormScreen() {
 
   return (
     <ScreenScaffold
-      mode="form"
+      mode="scroll"
       iosNativeHeader
+      avoidFloatingTabBar={false}
       contentContainerStyle={styles.formScrollContent}
       header={
         <AppHeader
@@ -407,7 +408,7 @@ export default function CustomerFormScreen() {
 
 const styles = StyleSheet.create({
   formScrollContent: {
-    paddingBottom: spacing.xl,
+    paddingBottom: 340,
   },
   formContainer: {
     padding: spacing.md,
