@@ -111,11 +111,9 @@ export default function PickupDetailsScreen() {
       iosNativeHeader
       header={(
         <AppHeader
-          title="Pickup Details"
+          title={request?.customerName ?? 'Pickup Details'}
           subtitle="Submitted request"
           onBack={() => router.back()}
-          backIconOnly
-          compact
         />
       )}
     >
