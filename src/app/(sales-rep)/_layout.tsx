@@ -18,6 +18,19 @@ export default function SalesRepLayout() {
     return <Redirect href={role === ROLES.DRIVER ? '/(driver)' : '/(auth)/sign-in'} />;
   }
 
+  const createTabListeners = (routeName: string) => ({ navigation }: any) => ({
+    tabPress: () => {
+      const state = navigation.getState();
+      const tabRoute = state.routes.find((r: any) => r.name === routeName);
+      if (tabRoute?.state?.key && tabRoute.state.index > 0) {
+        navigation.dispatch({
+          type: 'POP_TO_TOP',
+          target: tabRoute.state.key,
+        });
+      }
+    },
+  });
+
   return (
     <NativeTabs
       // Only force a remount on Android (where style props require a new native view).
@@ -45,7 +58,7 @@ export default function SalesRepLayout() {
       labelVisibilityMode={Platform.OS === 'android' ? 'selected' : undefined}
       rippleColor={Platform.OS === 'android' ? colors.tabBarRipple : undefined}
     >
-      <NativeTabs.Trigger name="(home)">
+      <NativeTabs.Trigger name="(home)" listeners={createTabListeners('(home)')}>
         <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="house" md="home" />
       </NativeTabs.Trigger>
@@ -55,12 +68,12 @@ export default function SalesRepLayout() {
         <NativeTabs.Trigger.Icon sf="plus.circle" md="add_circle" />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="customers">
+      <NativeTabs.Trigger name="customers" listeners={createTabListeners('customers')}>
         <NativeTabs.Trigger.Label>Customers</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="person.2" md="people" />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="follow-ups">
+      <NativeTabs.Trigger name="follow-ups" listeners={createTabListeners('follow-ups')}>
         <NativeTabs.Trigger.Label>Follow-Ups</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="checklist" md="event_note" />
       </NativeTabs.Trigger>
