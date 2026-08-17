@@ -299,10 +299,10 @@ export default function CustomerFormScreen() {
 
   return (
     <ScreenScaffold
-      mode="scroll"
+      mode="standard"
       iosNativeHeader
       avoidFloatingTabBar={false}
-      contentContainerStyle={styles.formScrollContent}
+      contentContainerStyle={styles.scaffoldContent}
       header={
         <AppHeader
           title={editingCustomer ? 'Edit Customer' : 'Add New Customer'}
@@ -310,6 +310,13 @@ export default function CustomerFormScreen() {
         />
       }
     >
+      <ScrollView
+        contentContainerStyle={styles.formScrollContent}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
+      >
       <View style={styles.formContainer}>
         {formError ? (
           <Text style={[styles.errorText, { color: colors.danger }]}>{formError}</Text>
@@ -402,12 +409,17 @@ export default function CustomerFormScreen() {
           />
         </View>
       </View>
+      </ScrollView>
     </ScreenScaffold>
   );
 }
 
 const styles = StyleSheet.create({
+  scaffoldContent: {
+    padding: 0,
+  },
   formScrollContent: {
+    padding: spacing.md,
     paddingBottom: 120,
   },
   formContainer: {
