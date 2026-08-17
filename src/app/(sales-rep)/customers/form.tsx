@@ -79,6 +79,7 @@ export default function CustomerFormScreen() {
   const [likelyExistingCustomer, setLikelyExistingCustomer] = useState<Customer | null>(null);
 
   const isSubmittingRef = useRef(false);
+  const scrollViewRef = useRef<ScrollView>(null);
   const requestedEditCustomerIdRef = useRef<string | null>(null);
   const duplicateSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const createAttemptRef = useRef<{
@@ -183,11 +184,13 @@ export default function CustomerFormScreen() {
     });
     if (!validation.success) {
       setFormError(validation.error);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
       return;
     }
 
     if (isOffline) {
       setFormError('No internet connection. Your information is still here. Reconnect and try again.');
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
       return;
     }
 
@@ -268,6 +271,7 @@ export default function CustomerFormScreen() {
         const msg = result.error
           ?? `Failed to ${editingCustomer ? 'update' : 'create'} customer.`;
         setFormError(msg);
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
         if (Platform.OS === 'ios') {
           showErrorMessage(msg, editingCustomer ? 'Update Error' : 'Creation Error');
         }
@@ -311,6 +315,7 @@ export default function CustomerFormScreen() {
       }
     >
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={styles.formScrollContent}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
