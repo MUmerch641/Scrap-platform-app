@@ -109,12 +109,12 @@ export default function CustomerDetailScreen() {
     });
   };
 
-  if (loading) return <ScreenScaffold mode="scroll" header={<AppHeader title="Customer" onBack={() => router.back()} />}><LoadingState message="Loading customer..." /></ScreenScaffold>;
-  if (!customer) return <ScreenScaffold mode="scroll" header={<AppHeader title="Customer" onBack={() => router.back()} />}><EmptyState title="Customer unavailable" message={error ?? 'This customer is no longer available.'} action={<Button title="Back to Customers" onPress={() => router.back()} />} /></ScreenScaffold>;
+  if (loading) return <ScreenScaffold mode="scroll" iosNativeHeader header={<AppHeader title="Customer" onBack={() => router.back()} />}><LoadingState message="Loading customer..." /></ScreenScaffold>;
+  if (!customer) return <ScreenScaffold mode="scroll" iosNativeHeader header={<AppHeader title="Customer" onBack={() => router.back()} />}><EmptyState title="Customer unavailable" message={error ?? 'This customer is no longer available.'} action={<Button title="Back to Customers" onPress={() => router.back()} />} /></ScreenScaffold>;
 
   const phone = customer.phone.replace(/[^\d+]/g, '');
   return (
-    <ScreenScaffold mode="scroll" header={<AppHeader title={customer.name} subtitle="Customer record" onBack={() => router.back()} />}>
+    <ScreenScaffold mode="scroll" iosNativeHeader header={<AppHeader title={customer.name} subtitle="Customer record" onBack={() => router.back()} />}>
       <View style={styles.container}>
         <View style={styles.actions}>
           <Button title="Create New Pickup" onPress={() => startPickup()} style={styles.primaryAction} />

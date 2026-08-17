@@ -11,8 +11,14 @@ export default function SalesRepHomeStackLayout() {
       }}
     >
       <Stack.Screen name="index" />
-      <Stack.Screen name="pickups" />
-      <Stack.Screen name="pickup/[id]" />
+      <Stack.Screen
+        name="pickups"
+        options={{ title: 'My Pickups', headerShown: Platform.OS === 'ios' }}
+      />
+      <Stack.Screen
+        name="pickup/[id]"
+        options={{ title: 'Pickup Details', headerShown: Platform.OS === 'ios' }}
+      />
     </Stack>
   );
 }
