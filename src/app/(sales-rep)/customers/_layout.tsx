@@ -15,6 +15,10 @@ export default function CustomersStackLayout() {
         name="[id]"
         options={{ title: 'Customer Details', headerShown: Platform.OS === 'ios' }}
       />
+      <Stack.Screen
+        name="form"
+        options={{ title: 'Customer Form', headerShown: Platform.OS === 'ios' }}
+      />
     </Stack>
   );
 }

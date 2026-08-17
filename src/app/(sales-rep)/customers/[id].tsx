@@ -119,7 +119,7 @@ export default function CustomerDetailScreen() {
         <View style={styles.actions}>
           <Button title="Create New Pickup" onPress={() => startPickup()} style={styles.primaryAction} />
           <Button title="Add Follow-Up" variant="secondary" onPress={() => router.push({ pathname: '/(sales-rep)/follow-ups', params: { customerId: customer.id, customerName: customer.name } } as unknown as Href)} style={styles.primaryAction} />
-          <Button title="Edit Customer" variant="outline" onPress={() => router.push({ pathname: '/(sales-rep)/customers', params: { editCustomerId: customer.id } })} style={styles.primaryAction} />
+          <Button title="Edit Customer" variant="outline" onPress={() => router.push({ pathname: '/(sales-rep)/customers/form', params: { editCustomerId: customer.id } } as unknown as Href)} style={styles.primaryAction} />
         </View>
 
         <Section title="Overview" colors={colors}>

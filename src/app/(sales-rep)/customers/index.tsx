@@ -2,12 +2,9 @@ import { Href, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rout
 import React, { useCallback, useRef, useState } from 'react';
 import {
     FlatList,
-    KeyboardAvoidingView,
     ListRenderItemInfo,
-    Modal,
     Platform,
     Pressable,
-    ScrollView,
     StyleSheet,
     Text,
     useColorScheme,
@@ -26,7 +23,6 @@ import { AppIcon } from '@/components/ui/app-icon';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { FormInput } from '@/components/ui/form-input';
 import {
   BrandSpinner,
   CONTENT_LOADER_SIZE,
@@ -36,29 +32,19 @@ import { ScreenScaffold } from '@/components/ui/screen-scaffold';
 import { SearchField } from '@/components/ui/search-field';
 import { StaggeredFadeIn } from '@/components/ui/staggered-fade-in';
 import {
-    createCustomer,
     CUSTOMER_STATUS_OPTIONS,
     CUSTOMER_TYPE_OPTIONS,
     Customer,
     CustomerStatus,
     CustomerType,
     fetchCustomersPage,
-    findCustomerByClientRequestId,
-    fetchCustomerById,
-    findLikelyExistingCustomer,
     PREFERRED_CONTACT_METHOD_OPTIONS,
     PreferredContactMethod,
-    updateCustomer,
-    validateCustomerInput,
 } from '@/services/customer-service';
-import { createClientRequestId } from '@/shared/client-request-id';
-import { useAppDialog } from '@/context/AppDialogContext';
 import { useNetworkStatus } from '@/context/NetworkStatusContext';
 import { OfflineState } from '@/components/ui/offline-state';
 import {
-    showErrorMessage,
     showInfoMessage,
-    showNativeConfirmation,
 } from '@/services/native-feedback-service';
 import { brandColors, radius, semanticColors, spacing, statusColors, typography } from '@/shared/theme';
 
@@ -66,6 +52,10 @@ import { brandColors, radius, semanticColors, spacing, statusColors, typography 
 const PAGE_SIZE = 30;
 const SEARCH_DEBOUNCE_MS = 350;
 // ─────────────────────────────────────────────────────────────────────────────
+
+function formatCustomerStatus(status: CustomerStatus): string {
+  return status.split('_').map((word) => word[0].toUpperCase() + word.slice(1)).join(' ');
+}
 
 // ── Customer row — stable render item for FlatList ───────────────────────────
 interface CustomerRowProps {
@@ -200,47 +190,11 @@ const AnimatedCustomerRow = React.memo(function AnimatedCustomerRow({
 ));
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ── Modal form fields with staggered entrance ────────────────────────────────
-const MODAL_STAGGER  = 45;
-const MODAL_DURATION = 300;
-const MODAL_EASE = Easing.out(Easing.cubic);
-
-function formatCustomerStatus(status: CustomerStatus): string {
-  return status.split('_').map((word) => word[0].toUpperCase() + word.slice(1)).join(' ');
-}
-
-interface FormFieldAnimatedProps {
-  delay: number;
-  children: React.ReactNode;
-}
-
-function FormFieldAnimated({ delay, children }: FormFieldAnimatedProps) {
-  const opacity    = useSharedValue(0);
-  const translateY = useSharedValue(10);
-
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      opacity.value    = withTiming(1, { duration: MODAL_DURATION, easing: MODAL_EASE });
-      translateY.value = withTiming(0, { duration: MODAL_DURATION, easing: MODAL_EASE });
-    }, delay);
-    return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const style = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }],
-  }));
-
-  return <Animated.View style={style}>{children}</Animated.View>;
-}
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function CustomersScreen() {
   const router = useRouter();
-  const { editCustomerId } = useLocalSearchParams<{ editCustomerId?: string }>();
   const colors = useColors();
-  const { showDialog } = useAppDialog();
   const { isOffline } = useNetworkStatus();
 
   // ── List state ─────────────────────────────────────────────────────────────
@@ -264,31 +218,6 @@ export default function CustomersScreen() {
   const hasRecordsRef               = useRef(false);
   // ──────────────────────────────────────────────────────────────────────────
 
-  // ── Add customer modal state ───────────────────────────────────────────────
-  const [showFormModal, setShowFormModal] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [name,     setName]     = useState('');
-  const [contactPerson, setContactPerson] = useState('');
-  const [phone,    setPhone]    = useState('');
-  const [email,    setEmail]    = useState('');
-  const [address,  setAddress]  = useState('');
-  const [customerType, setCustomerType] = useState<CustomerType>('business');
-  const [billingAddress, setBillingAddress] = useState('');
-  const [abn, setAbn] = useState('');
-  const [preferredContactMethod, setPreferredContactMethod] = useState<PreferredContactMethod | null>(null);
-  const [customerStatus, setCustomerStatus] = useState<CustomerStatus>('new_lead');
-  const [notes,    setNotes]    = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError]   = useState<string | null>(null);
-  const [likelyExistingCustomer, setLikelyExistingCustomer] = useState<Customer | null>(null);
-  const isSubmittingRef = useRef(false);
-  const requestedEditCustomerIdRef = useRef<string | null>(null);
-  const duplicateSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const createAttemptRef = useRef<{
-    clientRequestId: string;
-    fingerprint: string;
-    attempted: boolean;
-  } | null>(null);
   // ──────────────────────────────────────────────────────────────────────────
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -424,241 +353,6 @@ export default function CustomersScreen() {
   }, []);
   // ──────────────────────────────────────────────────────────────────────────
 
-  // ── Add customer ───────────────────────────────────────────────────────────
-  const resetForm = () => {
-    setName(''); setContactPerson(''); setPhone(''); setEmail('');
-    setAddress(''); setCustomerType('business'); setBillingAddress(''); setAbn('');
-    setPreferredContactMethod(null); setCustomerStatus('new_lead'); setNotes(''); setFormError(null);
-    createAttemptRef.current = null;
-    setLikelyExistingCustomer(null);
-  };
-
-  const closeFormModal = () => {
-    setShowFormModal(false);
-    setEditingCustomer(null);
-    resetForm();
-  };
-
-  const openAddCustomer = () => {
-    setEditingCustomer(null);
-    resetForm();
-    setShowFormModal(true);
-  };
-
-  const handleEditCustomer = useCallback((customer: Customer) => {
-    setEditingCustomer(customer);
-    setName(customer.name);
-    setContactPerson(customer.contactPerson ?? '');
-    setPhone(customer.phone);
-    setEmail(customer.email ?? '');
-    setAddress(customer.address);
-    setCustomerType(customer.customerType);
-    setBillingAddress(customer.billingAddress ?? '');
-    setAbn(customer.abn ?? '');
-    setPreferredContactMethod(customer.preferredContactMethod);
-    setCustomerStatus(customer.customerStatus);
-    setNotes(customer.notes ?? '');
-    setFormError(null);
-    setLikelyExistingCustomer(null);
-    setShowFormModal(true);
-  }, []);
-
-  React.useEffect(() => {
-    const customerId = editCustomerId?.trim();
-    if (!customerId || requestedEditCustomerIdRef.current === customerId) return;
-    requestedEditCustomerIdRef.current = customerId;
-    void fetchCustomerById(customerId).then((result) => {
-      if (result.success && result.customer) handleEditCustomer(result.customer);
-    });
-  }, [editCustomerId, handleEditCustomer]);
-
-  React.useEffect(() => {
-    if (duplicateSearchRef.current) clearTimeout(duplicateSearchRef.current);
-    if (!showFormModal || isOffline) {
-      return undefined;
-    }
-
-    const input = { name: name.trim(), phone: phone.trim(), email: email.trim() };
-    if (!input.name && !input.phone && !input.email) {
-      duplicateSearchRef.current = setTimeout(() => setLikelyExistingCustomer(null), 0);
-      return undefined;
-    }
-
-    duplicateSearchRef.current = setTimeout(() => {
-      void findLikelyExistingCustomer(input, editingCustomer?.id).then((result) => {
-        setLikelyExistingCustomer(result.success ? result.customer ?? null : null);
-      });
-    }, SEARCH_DEBOUNCE_MS);
-    return () => {
-      if (duplicateSearchRef.current) clearTimeout(duplicateSearchRef.current);
-    };
-  }, [editingCustomer?.id, email, isOffline, name, phone, showFormModal]);
-
-  const isFormDirty = editingCustomer
-    ? name !== editingCustomer.name
-      || contactPerson !== (editingCustomer.contactPerson ?? '')
-      || phone !== editingCustomer.phone
-      || email !== (editingCustomer.email ?? '')
-      || address !== editingCustomer.address
-      || customerType !== editingCustomer.customerType
-      || billingAddress !== (editingCustomer.billingAddress ?? '')
-      || abn !== (editingCustomer.abn ?? '')
-      || preferredContactMethod !== editingCustomer.preferredContactMethod
-      || customerStatus !== editingCustomer.customerStatus
-      || notes !== (editingCustomer.notes ?? '')
-    : Boolean(name || contactPerson || phone || email || address || customerType !== 'business' || billingAddress || abn || preferredContactMethod || customerStatus !== 'new_lead' || notes);
-
-  const requestCloseForm = () => {
-    if (submitting) return;
-    if (!isFormDirty) {
-      closeFormModal();
-      return;
-    }
-
-    const message = editingCustomer
-      ? 'Your customer edits have not been saved.'
-      : 'The new customer has not been saved.';
-    if (Platform.OS === 'ios') {
-      showNativeConfirmation('Discard changes?', message, closeFormModal, 'Discard');
-    } else {
-      showDialog({
-        title: 'Discard changes?',
-        message,
-        confirmLabel: 'Discard',
-        cancelLabel: 'Cancel',
-        destructive: true,
-        icon: 'alert-circle-outline',
-        dismissible: false,
-        onConfirm: closeFormModal,
-      });
-    }
-  };
-
-  const handleSaveCustomer = async (allowDuplicatePhone = false) => {
-    if (isSubmittingRef.current || submitting) return;
-    const validation = validateCustomerInput({
-      name, contactPerson, phone, email, address, customerType, billingAddress,
-      abn, preferredContactMethod, customerStatus, notes,
-    });
-    if (!validation.success) {
-      setFormError(validation.error);
-      return;
-    }
-
-    if (isOffline) {
-      setFormError('No internet connection. Your information is still here. Reconnect and try again.');
-      return;
-    }
-
-    isSubmittingRef.current = true;
-    setFormError(null);
-    setSubmitting(true);
-
-    try {
-      let createAttempt = createAttemptRef.current;
-      if (!editingCustomer) {
-        const fingerprint = JSON.stringify(validation.value);
-        if (!createAttempt || createAttempt.fingerprint !== fingerprint) {
-          createAttempt = {
-            clientRequestId: createClientRequestId(),
-            fingerprint,
-            attempted: false,
-          };
-          createAttemptRef.current = createAttempt;
-        }
-
-        if (createAttempt.attempted) {
-          const confirmation = await findCustomerByClientRequestId(
-            createAttempt.clientRequestId,
-          );
-          if (confirmation.success && confirmation.customer) {
-            showInfoMessage('Customer created successfully');
-            closeFormModal();
-            reload(activeSearchRef.current);
-            return;
-          }
-        }
-      }
-
-      if (!allowDuplicatePhone) {
-        const duplicateResult = await findLikelyExistingCustomer(
-          validation.value,
-          editingCustomer?.id,
-        );
-        if (duplicateResult.success && duplicateResult.customer) {
-          const existingCustomer = duplicateResult.customer;
-          const duplicateMessage =
-            `${existingCustomer.name} already uses this phone number. ` +
-            `Customer names may repeat. ${editingCustomer ? 'Save these changes' : 'Create this customer'} anyway?`;
-          const confirmLabel = editingCustomer ? 'Save Anyway' : 'Create Anyway';
-          if (Platform.OS === 'ios') {
-            showNativeConfirmation(
-              'Possible duplicate phone',
-              `${existingCustomer.name} already uses ${existingCustomer.phone}. ` +
-                `Customer names may repeat. ${editingCustomer ? 'Save these changes' : 'Create this customer'} anyway?`,
-              () => { void handleSaveCustomer(true); },
-              confirmLabel,
-            );
-          } else {
-            showDialog({
-              title: 'Customer already exists',
-              message: duplicateMessage,
-              confirmLabel,
-              cancelLabel: 'Cancel',
-              icon: 'alert-circle-outline',
-              dismissible: false,
-              onConfirm: () => handleSaveCustomer(true),
-            });
-          }
-          return;
-        }
-      }
-
-      if (createAttempt) createAttempt.attempted = true;
-      const result = editingCustomer
-        ? await updateCustomer(editingCustomer.id, validation.value)
-        : await createCustomer(validation.value, createAttempt!.clientRequestId);
-      if (result.success) {
-        showInfoMessage(
-          editingCustomer ? 'Customer updated successfully' : 'Customer created successfully',
-        );
-        closeFormModal();
-        reload(activeSearchRef.current);
-      } else {
-        const msg = result.error
-          ?? `Failed to ${editingCustomer ? 'update' : 'create'} customer.`;
-        setFormError(msg);
-        if (Platform.OS === 'ios') {
-          showErrorMessage(msg, editingCustomer ? 'Update Error' : 'Creation Error');
-        }
-      }
-    } finally {
-      isSubmittingRef.current = false;
-      setSubmitting(false);
-    }
-  };
-
-  const isFormValid = Boolean(name.trim() && phone.trim() && address.trim());
-  // ──────────────────────────────────────────────────────────────────────────
-
-  // ── Modal animation ────────────────────────────────────────────────────────
-  const modalScale   = useSharedValue(0.94);
-  const modalOpacity = useSharedValue(0);
-
-  React.useEffect(() => {
-    if (showFormModal) {
-      modalOpacity.value = withTiming(1, { duration: 200 });
-      modalScale.value   = withSpring(1, { mass: 0.6, stiffness: 260, damping: 22 });
-    } else {
-      modalOpacity.value = 0;
-      modalScale.value   = 0.94;
-    }
-  }, [showFormModal, modalOpacity, modalScale]);
-
-  const modalAnimStyle = useAnimatedStyle(() => ({
-    opacity: modalOpacity.value,
-    transform: [{ scale: modalScale.value }],
-  }));
   // ──────────────────────────────────────────────────────────────────────────
 
   const renderRow = useCallback(
@@ -711,7 +405,7 @@ export default function CustomersScreen() {
           compact
           rightAction={
             <Pressable
-              onPress={openAddCustomer}
+              onPress={() => router.push('/(sales-rep)/customers/form')}
               hitSlop={5}
               accessibilityRole="button"
               accessibilityLabel="Add customer"
@@ -813,7 +507,7 @@ export default function CustomersScreen() {
                   action={
                     <Button
                       title="Add Customer"
-                      onPress={openAddCustomer}
+                      onPress={() => router.push('/(sales-rep)/customers/form')}
                       variant="primary"
                     />
                   }
@@ -834,178 +528,6 @@ export default function CustomersScreen() {
           removeClippedSubviews
         />
       )}
-
-      {/* ── Add Customer Modal ─────────────────────────────────────────── */}
-      <Modal
-        visible={showFormModal}
-        animationType="fade"
-        transparent
-        onRequestClose={requestCloseForm}
-      >
-        {/*
-         * On iOS, KeyboardAvoidingView must NOT wrap the transparent overlay.
-         * Doing so shifts the entire semi-transparent backdrop when the keyboard
-         * opens, which looks broken and displaces the modal to the top on small
-         * iPhones. Instead, the overlay is a plain View (fixed in place) and KAV
-         * wraps only the card interior so the card itself adjusts for the keyboard.
-         */}
-        <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView
-            // Keep this container full-height and pad only the actual keyboard
-            // overlap. This works whether Android's dialog window resizes or not,
-            // while the fixed outer View keeps the backdrop from shifting on iOS.
-            behavior="padding"
-            style={styles.modalKAV}
-          >
-            <Animated.View
-              style={[
-                styles.modalCard,
-                { backgroundColor: colors.modalSurface, borderColor: colors.border },
-                modalAnimStyle,
-              ]}
-            >
-              {/* Header */}
-              <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>
-                  {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
-                </Text>
-                <Pressable
-                  onPress={requestCloseForm}
-                  hitSlop={12}
-                  accessibilityRole="button"
-                  accessibilityLabel="Close modal"
-                  style={styles.closeButton}
-                >
-                  <AppIcon name="close-circle-outline" size={22} color={colors.textMuted} />
-                </Pressable>
-              </View>
-
-              {/* Scrollable form */}
-              <ScrollView
-                style={styles.formScroll}
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
-                showsVerticalScrollIndicator
-                contentContainerStyle={styles.formScrollContent}
-              >
-                {formError ? (
-                  <Text style={[styles.errorText, { color: colors.danger }]}>{formError}</Text>
-                ) : null}
-
-                {!isOffline && likelyExistingCustomer ? (
-                  <Pressable
-                    onPress={() => {
-                      closeFormModal();
-                      router.push({ pathname: '/(sales-rep)/customers/[id]', params: { id: likelyExistingCustomer.id } } as unknown as Href);
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Open possible existing customer ${likelyExistingCustomer.name}`}
-                    style={[styles.duplicateSuggestion, { borderColor: colors.primary, backgroundColor: colors.surface }]}
-                  >
-                    <Text style={[styles.duplicateSuggestionTitle, { color: colors.text }]}>Possible existing customer</Text>
-                    <Text style={[styles.duplicateSuggestionText, { color: colors.textMuted }]}>{likelyExistingCustomer.name} · {likelyExistingCustomer.phone}. Open and reuse this record.</Text>
-                  </Pressable>
-                ) : null}
-
-                <FormFieldAnimated delay={MODAL_STAGGER * 0}>
-                  <FormInput label="Customer Name *" value={name} onChangeText={setName}
-                    placeholder="e.g. Acme Scrap Recycling" />
-                </FormFieldAnimated>
-
-                <FormFieldAnimated delay={MODAL_STAGGER * 1}>
-                  <FormInput label="Contact Person" value={contactPerson} onChangeText={setContactPerson}
-                    autoCapitalize="words" placeholder="e.g. Jordan Smith" />
-                </FormFieldAnimated>
-
-                <FormFieldAnimated delay={MODAL_STAGGER * 2}>
-                  <FormInput label="Phone Number *" value={phone} onChangeText={setPhone}
-                    keyboardType="phone-pad" placeholder="e.g. +61 412 345 678" />
-                </FormFieldAnimated>
-
-                <FormFieldAnimated delay={MODAL_STAGGER * 3}>
-                  <FormInput label="Email Address" value={email} onChangeText={setEmail}
-                    keyboardType="email-address" autoCapitalize="none"
-                    placeholder="e.g. contact@acmescrap.com" />
-                </FormFieldAnimated>
-
-                <FormFieldAnimated delay={MODAL_STAGGER * 4}>
-                  <FormInput label="Pickup Address *" value={address} onChangeText={setAddress}
-                    multiline numberOfLines={2}
-                    placeholder="e.g. 100 Industrial Parkway, Dock 4" />
-                </FormFieldAnimated>
-
-                <FormFieldAnimated delay={MODAL_STAGGER * 5}>
-                  <Text style={[styles.fieldLabel, { color: colors.text }]}>Customer Type</Text>
-                  <View style={styles.optionRow}>
-                    {CUSTOMER_TYPE_OPTIONS.map((option) => (
-                      <Pressable key={option} onPress={() => setCustomerType(option)} style={[styles.optionChip, {
-                        borderColor: customerType === option ? colors.accent : colors.border,
-                        backgroundColor: customerType === option ? colors.accent : 'transparent',
-                      }]}>
-                        <Text style={[styles.optionChipText, { color: customerType === option ? colors.onPrimary : colors.textMuted }]}>{option}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </FormFieldAnimated>
-
-                <FormFieldAnimated delay={MODAL_STAGGER * 6}>
-                  <FormInput label="Billing Address (Optional)" value={billingAddress} onChangeText={setBillingAddress}
-                    multiline numberOfLines={2} placeholder="Leave blank if same as pickup address" />
-                </FormFieldAnimated>
-
-                <FormFieldAnimated delay={MODAL_STAGGER * 7}>
-                  <FormInput label="ABN (Optional)" value={abn} onChangeText={setAbn}
-                    keyboardType="number-pad" placeholder="11 digits" />
-                </FormFieldAnimated>
-
-                <FormFieldAnimated delay={MODAL_STAGGER * 8}>
-                  <Text style={[styles.fieldLabel, { color: colors.text }]}>Preferred Contact Method (Optional)</Text>
-                  <View style={styles.optionRow}>
-                    <Pressable onPress={() => setPreferredContactMethod(null)} style={[styles.optionChip, {
-                      borderColor: preferredContactMethod === null ? colors.accent : colors.border,
-                      backgroundColor: preferredContactMethod === null ? colors.accent : 'transparent',
-                    }]}><Text style={[styles.optionChipText, { color: preferredContactMethod === null ? colors.onPrimary : colors.textMuted }]}>none</Text></Pressable>
-                    {PREFERRED_CONTACT_METHOD_OPTIONS.map((option) => (
-                      <Pressable key={option} onPress={() => setPreferredContactMethod(option)} style={[styles.optionChip, {
-                        borderColor: preferredContactMethod === option ? colors.accent : colors.border,
-                        backgroundColor: preferredContactMethod === option ? colors.accent : 'transparent',
-                      }]}><Text style={[styles.optionChipText, { color: preferredContactMethod === option ? colors.onPrimary : colors.textMuted }]}>{option}</Text></Pressable>
-                    ))}
-                  </View>
-                </FormFieldAnimated>
-
-                <FormFieldAnimated delay={MODAL_STAGGER * 9}>
-                  <Text style={[styles.fieldLabel, { color: colors.text }]}>Customer Status</Text>
-                  <View style={styles.optionRow}>
-                    {CUSTOMER_STATUS_OPTIONS.map((option) => (
-                      <Pressable key={option} onPress={() => setCustomerStatus(option)} style={[styles.optionChip, {
-                        borderColor: customerStatus === option ? colors.accent : colors.border,
-                        backgroundColor: customerStatus === option ? colors.accent : 'transparent',
-                      }]}><Text style={[styles.optionChipText, { color: customerStatus === option ? colors.onPrimary : colors.textMuted }]}>{formatCustomerStatus(option)}</Text></Pressable>
-                    ))}
-                  </View>
-                </FormFieldAnimated>
-
-                <FormFieldAnimated delay={MODAL_STAGGER * 10}>
-                  <FormInput label="Notes" value={notes} onChangeText={setNotes}
-                    multiline numberOfLines={4} style={styles.notesInput}
-                    placeholder="Optional customer instructions or contact details" />
-                </FormFieldAnimated>
-              </ScrollView>
-
-              {/* Sticky footer */}
-              <View style={[styles.stickyFooter, { borderTopColor: colors.border }]}>
-                <Button title="Cancel" variant="outline" style={styles.footerBtn}
-                  onPress={requestCloseForm} />
-                <Button title={editingCustomer ? 'Save Changes' : 'Add Customer'}
-                  variant="primary" style={styles.footerBtn}
-                  loading={submitting} disabled={submitting || !isFormValid}
-                  onPress={() => void handleSaveCustomer()} />
-              </View>
-            </Animated.View>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
     </ScreenScaffold>
   );
 }
@@ -1164,60 +686,6 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.xs,
     fontStyle: 'italic',
   },
-
-  // ── Modal ──────────────────────────────────────────────────────────────────
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    padding: spacing.md,
-  },
-  modalKAV: {
-    flex: 1,
-    width: '100%',
-    justifyContent: 'center',
-  },
-  modalCard: {
-    maxHeight: '85%',
-    flexShrink: 1,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    flexDirection: 'column',
-    overflow: 'hidden',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  modalTitle: {
-    fontFamily: typography.fontFamily.headingSemibold,
-    fontSize: typography.fontSize.md,
-  },
-  closeText: {
-    fontFamily: typography.fontFamily.heading,
-    fontSize: typography.fontSize.lg,
-  },
-  closeButton: {
-    minHeight: 32,
-    minWidth: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  formScrollContent: {
-    padding: spacing.sm,
-    paddingBottom: spacing.md,
-  },
-  formScroll: {
-    flexShrink: 1,
-  },
-  notesInput: {
-    minHeight: 88,
-    paddingTop: spacing.sm,
-    textAlignVertical: 'top',
-  },
   statusText: {
     fontFamily: typography.fontFamily.bodySemibold,
     fontSize: 11,
@@ -1239,57 +707,5 @@ const styles = StyleSheet.create({
   createPickupActionText: {
     fontFamily: typography.fontFamily.bodyMedium,
     fontSize: typography.fontSize.xs,
-  },
-  fieldLabel: {
-    fontFamily: typography.fontFamily.bodyMedium,
-    fontSize: typography.fontSize.sm,
-    marginBottom: spacing.xs,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  optionChip: {
-    borderWidth: 1,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  optionChipText: {
-    fontFamily: typography.fontFamily.bodyMedium,
-    fontSize: typography.fontSize.xs,
-    textTransform: 'capitalize',
-  },
-  errorText: {
-    fontFamily: typography.fontFamily.bodyMedium,
-    fontSize: typography.fontSize.xs,
-    marginBottom: spacing.xs,
-  },
-  duplicateSuggestion: {
-    borderWidth: 1,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    gap: 2,
-    marginBottom: spacing.sm,
-  },
-  duplicateSuggestionTitle: {
-    fontFamily: typography.fontFamily.bodySemibold,
-    fontSize: typography.fontSize.sm,
-  },
-  duplicateSuggestionText: {
-    fontFamily: typography.fontFamily.body,
-    fontSize: typography.fontSize.xs,
-    lineHeight: typography.lineHeight.xs,
-  },
-  stickyFooter: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  footerBtn: {
-    flex: 1,
   },
 });
